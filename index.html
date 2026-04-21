@@ -245,6 +245,42 @@ const GAMES = [
     start: startBlock,
     stop: stopBlock,
   },
+  ,{
+    id: 'tetris',
+    title: 'テトリス',
+    genre: 'パズル',
+    desc: 'ブロックを積んでラインを消せ！消すほどスコアUP！',
+    bg: '#06001a',
+    accentColor: '#00cfff',
+    controls: '← → ↓ で移動 / ↑ で回転',
+    init: initTetris,
+    start: startTetris,
+    stop: stopTetris,
+  },
+  {
+    id: 'puyo',
+    title: 'ぷよぷよ',
+    genre: 'パズル',
+    desc: '同じ色を4つ以上つなげて消せ！連鎖でボーナス！',
+    bg: '#1a0a00',
+    accentColor: '#ffaa00',
+    controls: '← → で移動 / ↑ で回転',
+    init: initPuyo,
+    start: startPuyo,
+    stop: stopPuyo,
+  },
+  {
+    id: 'clicker',
+    title: 'たまごっちクリッカー',
+    genre: '育成',
+    desc: 'タップしてキャラを育てよう！進化するかも！？',
+    bg: '#0a001a',
+    accentColor: '#ff88ff',
+    controls: 'タップで育てる',
+    init: initClicker,
+    start: startClicker,
+    stop: stopClicker,
+  },
 ];
 
 // ══════════════════════════════════
@@ -413,7 +449,7 @@ function startGame(id){
   const overlay = document.getElementById('overlay_'+id);
   overlay.classList.add('hidden');
   gameActive = true;
-  if(id !== 'snake') showCtrlBtns(id);
+  if(id !== 'snake' && id !== 'clicker') showCtrlBtns(id);
   g.start();
 }
 
@@ -694,6 +730,304 @@ function startBlock(){
 }
 function stopBlock(){cancelAnimationFrame(blockRAF);if(gameHandles.block){document.removeEventListener('keydown',gameHandles.block.onKey);document.removeEventListener('keyup',gameHandles.block.onKey);}}
 
+
+// ══════════════════════════════════
+// TETRIS
+// ══════════════════════════════════
+let tetrisTimer;
+const SHAPES=[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0],[1,0],[1,1]],[[0,1],[0,1],[1,1]],[[1,1,0],[0,1,1]],[[0,1,1],[1,1,0]]];
+const TCOLORS=['#00cfff','#ffdd00','#aa44ff','#ff8800','#4488ff','#ff4444','#44ff88'];
+function initTetris(canvas){
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#06001a';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#00cfff';ctx.font='bold 14px "Space Mono"';ctx.textAlign='center';
+  ctx.fillText('TAP PLAY TO START',canvas.width/2,canvas.height/2);
+}
+function startTetris(){
+  clearInterval(tetrisTimer);
+  const canvas=document.getElementById('canvas_tetris');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const COLS=10,SZ=Math.floor(W/COLS);
+  const ROWS=Math.floor(H/SZ);
+  let board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  let score=0,level=1;
+  let cur,curX,curY,curShape,curColor;
+  function newPiece(){
+    const si=Math.floor(Math.random()*SHAPES.length);
+    curShape=SHAPES[si].map(r=>[...r]);
+    curColor=TCOLORS[si];
+    curX=Math.floor(COLS/2)-Math.floor(curShape[0].length/2);
+    curY=0;
+    if(!canPlace(curShape,curX,curY)){gameOver('tetris',score);}
+  }
+  function canPlace(s,x,y){
+    for(let r=0;r<s.length;r++)for(let c=0;c<s[r].length;c++){
+      if(s[r][c]&&(y+r>=ROWS||x+c<0||x+c>=COLS||board[y+r][x+c]))return false;
+    }return true;
+  }
+  function place(){
+    for(let r=0;r<curShape.length;r++)for(let c=0;c<curShape[r].length;c++){
+      if(curShape[r][c])board[curY+r][curX+c]=curColor;
+    }
+    let lines=0;
+    for(let r=ROWS-1;r>=0;r--){
+      if(board[r].every(c=>c)){board.splice(r,1);board.unshift(Array(COLS).fill(0));lines++;r++;}
+    }
+    if(lines>0){score+=lines*100*level;level=Math.floor(score/500)+1;updateScore('tetris',score);}
+    newPiece();
+  }
+  function rotate(s){return s[0].map((_,i)=>s.map(r=>r[i]).reverse());}
+  function draw(){
+    ctx.fillStyle='#06001a';ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='rgba(0,207,255,.06)';ctx.lineWidth=.5;
+    for(let x=0;x<W;x+=SZ){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=SZ){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    board.forEach((row,r)=>row.forEach((col,c)=>{
+      if(col){ctx.fillStyle=col;ctx.fillRect(c*SZ+1,r*SZ+1,SZ-2,SZ-2);
+      ctx.strokeStyle='rgba(255,255,255,.2)';ctx.strokeRect(c*SZ+1,r*SZ+1,SZ-2,SZ-2);}
+    }));
+    curShape.forEach((row,r)=>row.forEach((v,c)=>{
+      if(v){ctx.fillStyle=curColor;ctx.fillRect((curX+c)*SZ+1,(curY+r)*SZ+1,SZ-2,SZ-2);
+      ctx.strokeStyle='rgba(255,255,255,.3)';ctx.strokeRect((curX+c)*SZ+1,(curY+r)*SZ+1,SZ-2,SZ-2);}
+    }));
+    // ghost
+    let gy=curY;while(canPlace(curShape,curX,gy+1))gy++;
+    if(gy!==curY){curShape.forEach((row,r)=>row.forEach((v,c)=>{
+      if(v){ctx.fillStyle='rgba(255,255,255,.1)';ctx.fillRect((curX+c)*SZ+1,(gy+r)*SZ+1,SZ-2,SZ-2);}
+    }));}
+  }
+  function onKey(e){
+    if(e.key==='ArrowLeft'&&canPlace(curShape,curX-1,curY))curX--;
+    if(e.key==='ArrowRight'&&canPlace(curShape,curX+1,curY))curX++;
+    if(e.key==='ArrowDown'&&canPlace(curShape,curX,curY+1))curY++;
+    if(e.key==='ArrowUp'){const r=rotate(curShape);if(canPlace(r,curX,curY))curShape=r;}
+    if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp'].includes(e.key))e.preventDefault();
+    draw();
+  }
+  document.addEventListener('keydown',onKey);
+  // ボタン操作
+  const btnL=document.getElementById('btnL_tetris');
+  const btnR=document.getElementById('btnR_tetris');
+  let btnTimer;
+  function onBtnL(){if(canPlace(curShape,curX-1,curY)){curX--;draw();}}
+  function onBtnR(){if(canPlace(curShape,curX+1,curY)){curX++;draw();}}
+  // 上部タップで回転
+  canvas.addEventListener('touchend',e=>{
+    e.stopPropagation();
+    const r=rotate(curShape);if(canPlace(r,curX,curY)){curShape=r;draw();}
+  },{passive:true});
+  if(btnL)btnL.addEventListener('pointerdown',onBtnL);
+  if(btnR)btnR.addEventListener('pointerdown',onBtnR);
+  gameHandles.tetris={onKey,onBtnL,onBtnR};
+  newPiece();draw();
+  const speed=()=>Math.max(100,500-level*50);
+  function tick(){
+    if(canPlace(curShape,curX,curY+1))curY++;
+    else place();
+    draw();
+    tetrisTimer=setTimeout(tick,speed());
+  }
+  tetrisTimer=setTimeout(tick,500);
+}
+function stopTetris(){
+  clearInterval(tetrisTimer);clearTimeout(tetrisTimer);
+  if(gameHandles.tetris){
+    document.removeEventListener('keydown',gameHandles.tetris.onKey);
+    const btnL=document.getElementById('btnL_tetris');
+    const btnR=document.getElementById('btnR_tetris');
+    if(btnL&&gameHandles.tetris.onBtnL)btnL.removeEventListener('pointerdown',gameHandles.tetris.onBtnL);
+    if(btnR&&gameHandles.tetris.onBtnR)btnR.removeEventListener('pointerdown',gameHandles.tetris.onBtnR);
+  }
+}
+
+// ══════════════════════════════════
+// PUYO
+// ══════════════════════════════════
+let puyoTimer;
+const PCOLORS=['#ff4444','#44aaff','#44dd44','#ffdd00','#ff88ff'];
+function initPuyo(canvas){
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#1a0a00';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#ffaa00';ctx.font='bold 14px "Space Mono"';ctx.textAlign='center';
+  ctx.fillText('TAP PLAY TO START',canvas.width/2,canvas.height/2);
+}
+function startPuyo(){
+  clearTimeout(puyoTimer);
+  const canvas=document.getElementById('canvas_puyo');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const COLS=6,SZ=Math.floor(W/COLS),ROWS=Math.floor(H/SZ);
+  let board=Array.from({length:ROWS},()=>Array(COLS).fill(null));
+  let score=0;
+  let curA,curB,curX,curY,curRot;
+  function randColor(){return PCOLORS[Math.floor(Math.random()*PCOLORS.length)];}
+  function newPair(){curA=randColor();curB=randColor();curX=Math.floor(COLS/2)-1;curY=0;curRot=0;
+    if(board[0][curX]){gameOver('puyo',score);}
+  }
+  function pairPositions(){
+    const offsets=[[0,0],[0,-1],[1,0],[0,1],[-1,0]];
+    const [bx,by]=[[0,-1],[1,0],[0,1],[-1,0]][curRot];
+    return [{x:curX,y:curY,c:curA},{x:curX+bx,y:curY+by,c:curB}];
+  }
+  function canMove(dx,dy,rot){
+    const off=[[0,-1],[1,0],[0,1],[-1,0]][rot??curRot];
+    const pos=[{x:curX+dx,y:curY+dy},{x:curX+dx+off[0],y:curY+dy+off[1]}];
+    return pos.every(p=>p.x>=0&&p.x<COLS&&p.y>=0&&p.y<ROWS&&!board[p.y]?.[p.x]);
+  }
+  function place(){
+    pairPositions().forEach(p=>{if(p.y>=0&&p.y<ROWS)board[p.y][p.x]=p.c;});
+    // gravity
+    for(let c=0;c<COLS;c++){const col=board.map(r=>r[c]).filter(v=>v);while(col.length<ROWS)col.unshift(null);board.forEach((r,i)=>r[c]=col[i]);}
+    // check groups
+    let cleared=checkAndClear();
+    if(cleared>0){score+=cleared*100;updateScore('puyo',score);}
+    newPair();
+  }
+  function checkAndClear(){
+    let total=0;
+    const visited=Array.from({length:ROWS},()=>Array(COLS).fill(false));
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      if(board[r][c]&&!visited[r][c]){
+        const col=board[r][c],group=[];
+        const stack=[[r,c]];
+        while(stack.length){const[gr,gc]=stack.pop();if(gr<0||gr>=ROWS||gc<0||gc>=COLS||visited[gr][gc]||board[gr][gc]!==col)continue;visited[gr][gc]=true;group.push([gr,gc]);stack.push([gr-1,gc],[gr+1,gc],[gr,gc-1],[gr,gc+1]);}
+        if(group.length>=4){group.forEach(([gr,gc])=>board[gr][gc]=null);total+=group.length;}
+      }
+    }
+    if(total>0){for(let c=0;c<COLS;c++){const col=board.map(r=>r[c]).filter(v=>v);while(col.length<ROWS)col.unshift(null);board.forEach((r,i)=>r[c]=col[i]);}}
+    return total;
+  }
+  function drawPuyo(ctx,x,y,col){
+    ctx.fillStyle=col;ctx.beginPath();ctx.arc(x+SZ/2,y+SZ/2,SZ/2-2,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.arc(x+SZ/2-3,y+SZ/2-3,SZ/6,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,.5)';ctx.beginPath();ctx.arc(x+SZ/2-2,y+SZ/2+2,SZ/8,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x+SZ/2+2,y+SZ/2+2,SZ/8,0,Math.PI*2);ctx.fill();
+  }
+  function draw(){
+    ctx.fillStyle='#1a0a00';ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='rgba(255,170,0,.06)';ctx.lineWidth=.5;
+    for(let x=0;x<W;x+=SZ){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=SZ){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    board.forEach((row,r)=>row.forEach((col,c)=>{if(col)drawPuyo(ctx,c*SZ,r*SZ,col);}));
+    pairPositions().forEach(p=>{if(p.y>=0)drawPuyo(ctx,p.x*SZ,p.y*SZ,p.c);});
+  }
+  function onKey(e){
+    if(e.key==='ArrowLeft'&&canMove(-1,0))curX--;
+    if(e.key==='ArrowRight'&&canMove(1,0))curX++;
+    if(e.key==='ArrowDown'&&canMove(0,1))curY++;
+    if(e.key==='ArrowUp'){const nr=(curRot+1)%4;if(canMove(0,0,nr))curRot=nr;}
+    if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp'].includes(e.key))e.preventDefault();
+    draw();
+  }
+  document.addEventListener('keydown',onKey);
+  const btnL=document.getElementById('btnL_puyo');
+  const btnR=document.getElementById('btnR_puyo');
+  function onBtnL(){if(canMove(-1,0)){curX--;draw();}}
+  function onBtnR(){if(canMove(1,0)){curX++;draw();}}
+  if(btnL)btnL.addEventListener('pointerdown',onBtnL);
+  if(btnR)btnR.addEventListener('pointerdown',onBtnR);
+  canvas.addEventListener('touchend',e=>{e.stopPropagation();const nr=(curRot+1)%4;if(canMove(0,0,nr)){curRot=nr;draw();}},{passive:true});
+  gameHandles.puyo={onKey,onBtnL,onBtnR};
+  newPair();draw();
+  function tick(){
+    if(canMove(0,1))curY++;else place();
+    draw();puyoTimer=setTimeout(tick,600);
+  }
+  puyoTimer=setTimeout(tick,600);
+}
+function stopPuyo(){
+  clearTimeout(puyoTimer);
+  if(gameHandles.puyo){
+    document.removeEventListener('keydown',gameHandles.puyo.onKey);
+    const btnL=document.getElementById('btnL_puyo');
+    const btnR=document.getElementById('btnR_puyo');
+    if(btnL&&gameHandles.puyo.onBtnL)btnL.removeEventListener('pointerdown',gameHandles.puyo.onBtnL);
+    if(btnR&&gameHandles.puyo.onBtnR)btnR.removeEventListener('pointerdown',gameHandles.puyo.onBtnR);
+  }
+}
+
+// ══════════════════════════════════
+// CLICKER
+// ══════════════════════════════════
+let clickerRAF;
+function initClicker(canvas){
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#0a001a';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#ff88ff';ctx.font='bold 14px "Space Mono"';ctx.textAlign='center';
+  ctx.fillText('TAP PLAY TO START',canvas.width/2,canvas.height/2);
+}
+function startClicker(){
+  cancelAnimationFrame(clickerRAF);
+  const canvas=document.getElementById('canvas_clicker');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  let score=0,clicks=0,particles=[];
+  const stages=[
+    {name:'たまご',emoji:'🥚',color:'#ffeecc',unlockAt:0},
+    {name:'ひよこ',emoji:'🐣',color:'#ffdd44',unlockAt:20},
+    {name:'にわとり',emoji:'🐔',color:'#ff8800',unlockAt:100},
+    {name:'ドラゴン',emoji:'🐉',color:'#ff4444',unlockAt:300},
+    {name:'神',emoji:'✨',color:'#ffffff',unlockAt:1000},
+  ];
+  let stage=0;
+  let shakeX=0,shakeY=0;
+  function getStage(){for(let i=stages.length-1;i>=0;i--)if(clicks>=stages[i].unlockAt)return i;return 0;}
+  function draw(){
+    ctx.fillStyle='#0a001a';ctx.fillRect(0,0,W,H);
+    // 星背景
+    ctx.fillStyle='rgba(255,136,255,.03)';
+    for(let i=0;i<5;i++){ctx.beginPath();ctx.arc(Math.sin(i*1.7)*W*.4+W/2,Math.cos(i*1.3)*H*.3+H/2,80+i*20,0,Math.PI*2);ctx.fill();}
+    const s=stages[stage];
+    // キャラ
+    ctx.font=`${80+stage*8}px serif`;ctx.textAlign='center';
+    ctx.fillText(s.emoji,W/2+shakeX,H/2+shakeY);
+    shakeX*=.8;shakeY*=.8;
+    // HP/レベルバー
+    const prog=stage<stages.length-1?(clicks-stages[stage].unlockAt)/(stages[stage+1].unlockAt-stages[stage].unlockAt):1;
+    ctx.fillStyle='rgba(255,136,255,.2)';ctx.beginPath();ctx.roundRect(W*.1,H*.72,W*.8,12,6);ctx.fill();
+    ctx.fillStyle=s.color;ctx.beginPath();ctx.roundRect(W*.1,H*.72,W*.8*prog,12,6);ctx.fill();
+    // ステージ名
+    ctx.fillStyle='rgba(255,136,255,.8)';ctx.font='bold 13px "Space Mono"';ctx.textAlign='center';
+    ctx.fillText(s.name,W/2,H*.7);
+    // スコア
+    ctx.fillStyle='rgba(255,255,255,.9)';ctx.font='bold 16px "Space Mono"';
+    ctx.fillText('TAP: '+clicks,W/2,H*.82);
+    // 次の進化
+    if(stage<stages.length-1){ctx.fillStyle='rgba(255,136,255,.5)';ctx.font='11px "Space Mono"';ctx.fillText('次の進化まで '+(stages[stage+1].unlockAt-clicks)+'回',W/2,H*.88);}
+    else{ctx.fillStyle='rgba(255,215,0,.8)';ctx.font='bold 13px "Space Mono"';ctx.fillText('★ 最強に進化済み ★',W/2,H*.88);}
+    // パーティクル
+    particles=particles.filter(p=>{
+      p.x+=p.vx;p.y+=p.vy;p.vy+=.15;p.life-=.03;
+      ctx.globalAlpha=p.life;ctx.font=`${p.size}px serif`;ctx.fillText(p.emoji,p.x,p.y);
+      ctx.globalAlpha=1;return p.life>0;
+    });
+    clickerRAF=requestAnimationFrame(draw);
+  }
+  function onTap(e){
+    e.stopPropagation();
+    clicks++;score=clicks*10;updateScore('clicker',score);
+    shakeX=(Math.random()-.5)*12;shakeY=(Math.random()-.5)*12;
+    const newStage=getStage();
+    if(newStage>stage){stage=newStage;showToast('進化！'+stages[stage].emoji+' '+stages[stage].name);}
+    const cx=e.touches?e.touches[0].clientX:e.clientX;
+    const cy=e.touches?e.touches[0].clientY:e.clientY;
+    const rect=canvas.getBoundingClientRect();
+    particles.push({x:cx-rect.left,y:cy-rect.top,vx:(Math.random()-.5)*3,vy:-Math.random()*4-2,life:1,emoji:['✨','💫','⭐','💥'][Math.floor(Math.random()*4)],size:16+Math.random()*10});
+  }
+  canvas.addEventListener('touchstart',onTap,{passive:true});
+  canvas.addEventListener('click',onTap);
+  gameHandles.clicker={onTap};
+  draw();
+}
+function stopClicker(){
+  cancelAnimationFrame(clickerRAF);
+  if(gameHandles.clicker){
+    const canvas=document.getElementById('canvas_clicker');
+    if(canvas){canvas.removeEventListener('touchstart',gameHandles.clicker.onTap);canvas.removeEventListener('click',gameHandles.clicker.onTap);}
+  }
+}
+
 // ══════════════════════════════════
 // RANKING
 // ══════════════════════════════════
@@ -702,6 +1036,9 @@ const DUMMY = {
   shooter:[{n:'アキラ',s:580},{n:'ノア',s:460},{n:'ミサキ',s:390},{n:'カイ',s:310},{n:'ルカ',s:250}],
   dodge:[{n:'ユイ',s:412},{n:'レン',s:370},{n:'サクラ',s:290},{n:'コウ',s:220},{n:'ナナ',s:180}],
   block:[{n:'ツバサ',s:720},{n:'ヒナ',s:640},{n:'アオイ',s:530},{n:'ケイ',s:420},{n:'マイ',s:360}],
+  tetris:[{n:'リュウ',s:4200},{n:'ミオ',s:3800},{n:'ショウ',s:2900},{n:'アヤ',s:2100},{n:'タク',s:1500}],
+  puyo:[{n:'ハナ',s:3200},{n:'ケイタ',s:2700},{n:'ユズ',s:1900},{n:'リク',s:1400},{n:'モモ',s:900}],
+  clicker:[{n:'ソラ',s:9800},{n:'イツキ',s:7200},{n:'ナギ',s:5600},{n:'コトネ',s:3400},{n:'ヒビキ',s:2100}],
 };
 let rankGame='snake';
 function openRank(){
