@@ -124,7 +124,7 @@ svg.ico{width:16px;height:16px;fill:none;stroke:rgba(240,240,255,.7);stroke-widt
 
 /* ── CONTROLS HINT ── */
 .ctrl-hint{position:absolute;bottom:14px;left:14px;font-size:9px;font-family:var(--mono);color:rgba(255,255,255,.2);line-height:1.8;pointer-events:none}
-.ctrl-btns{position:absolute;bottom:10px;left:0;right:0;display:none;justify-content:space-between;padding:0 20px;pointer-events:none}
+.ctrl-btns{position:absolute;bottom:90px;left:0;right:0;display:none;justify-content:space-between;padding:0 20px;pointer-events:none}
 .ctrl-btns.show{display:flex}
 .ctrl-btn{width:70px;height:48px;border-radius:12px;background:rgba(255,255,255,.12);border:0.5px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;pointer-events:all;user-select:none;-webkit-user-select:none}
 .ctrl-btn:active{background:rgba(255,255,255,.28)}
@@ -367,7 +367,10 @@ function setupSwipe(){
 // ══════════════════════════════════
 const btnState = {left: false, right: false};
 
+const ctrlBtnsSetup = {};
 function setupCtrlBtns(id) {
+  if(ctrlBtnsSetup[id]) return;
+  ctrlBtnsSetup[id] = true;
   const btnL = document.getElementById('btnL_'+id);
   const btnR = document.getElementById('btnR_'+id);
   if(!btnL||!btnR) return;
@@ -520,6 +523,7 @@ function initShooter(canvas){
   ctx.fillText('TAP PLAY TO START',canvas.width/2,canvas.height/2);
 }
 function startShooter(){
+  cancelAnimationFrame(shooterRAF);
   const canvas=document.getElementById('canvas_shooter');
   const ctx=canvas.getContext('2d');
   const W=canvas.width,H=canvas.height;
@@ -591,6 +595,7 @@ function initDodge(canvas){
   ctx.fillText('TAP PLAY TO START',canvas.width/2,canvas.height/2);
 }
 function startDodge(){
+  cancelAnimationFrame(dodgeRAF);
   const canvas=document.getElementById('canvas_dodge');
   const ctx=canvas.getContext('2d');
   const W=canvas.width,H=canvas.height;
@@ -642,6 +647,7 @@ function initBlock(canvas){
   ctx.fillText('TAP PLAY TO START',canvas.width/2,canvas.height/2);
 }
 function startBlock(){
+  cancelAnimationFrame(blockRAF);
   const canvas=document.getElementById('canvas_block');
   const ctx=canvas.getContext('2d');
   const W=canvas.width,H=canvas.height;
