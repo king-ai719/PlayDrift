@@ -536,8 +536,8 @@ function startShooter(){
     ctx.fillStyle='rgba(124,109,255,.3)';ctx.beginPath();ctx.moveTo(px-8,py+16);ctx.lineTo(px,py+28);ctx.lineTo(px+8,py+16);ctx.closePath();ctx.fill();
     frame++;
     if(frame%60===0)spawnEnemy();
-    if(keys['ArrowLeft']||touchX<W/2){px=Math.max(20,px-speed);}
-    if(keys['ArrowRight']||touchX>W/2){px=Math.min(W-20,px+speed);}
+    if(keys['ArrowLeft']||(touchX!==null&&touchX<W/2)){px=Math.max(20,px-speed);}
+    if(keys['ArrowRight']||(touchX!==null&&touchX>W/2)){px=Math.min(W-20,px+speed);}
     shooterRAF=requestAnimationFrame(draw);
   }
   gameHandles.shooter={onKey,autoShoot};
@@ -590,8 +590,8 @@ function startDodge(){
     ctx.fillStyle='#ff6b9d';ctx.beginPath();ctx.arc(px-4,py-3,1.5,0,Math.PI*2);ctx.fill();
     frame++;score=Math.floor(frame/6);updateScore('dodge',score);
     if(frame%50===0){spawnObs();if(frame%300===0)speed+=.3;}
-    if(keys['ArrowLeft']||touchX<W/2){px=Math.max(14,px-4);}
-    if(keys['ArrowRight']||touchX>W/2){px=Math.min(W-14,px+4);}
+    if(keys['ArrowLeft']||(touchX!==null&&touchX<W/2)){px=Math.max(14,px-4);}
+    if(keys['ArrowRight']||(touchX!==null&&touchX>W/2)){px=Math.min(W-14,px+4);}
     dodgeRAF=requestAnimationFrame(draw);
   }
   gameHandles.dodge={onKey};
@@ -638,8 +638,8 @@ function startBlock(){
       }
     });
     // pad
-    if(keys['ArrowLeft']||touchX<W/2){padX=Math.max(0,padX-6);}
-    if(keys['ArrowRight']||touchX>W/2){padX=Math.min(W-padW,padX+6);}
+    if(keys['ArrowLeft']||(touchX!==null&&touchX<W/2)){padX=Math.max(0,padX-6);}
+    if(keys['ArrowRight']||(touchX!==null&&touchX>W/2)){padX=Math.min(W-padW,padX+6);}
     ctx.fillStyle='#ffd700';ctx.beginPath();ctx.roundRect(padX,padY,padW,padH,5);ctx.fill();
     // ball
     ball.x+=ball.vx;ball.y+=ball.vy;
