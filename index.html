@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>PlayDrift — プレドリ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#080810;
+  --surface:#0f0f1a;
+  --border:rgba(255,255,255,0.08);
+  --text:#f0f0ff;
+  --muted:rgba(240,240,255,0.4);
+  --accent:#7c6dff;
+  --accent2:#ff6b9d;
+  --green:#00ffaa;
+  --mono:'Space Mono',monospace;
+  --display:'Syne',sans-serif;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--display)}
+
+/* ── SPLASH ── */
+#splash{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;transition:opacity .5s}
+#splash.hide{opacity:0;pointer-events:none}
+.splash-logo{font-size:48px;font-weight:800;letter-spacing:-2px;margin-bottom:8px}
+.splash-logo span{color:var(--accent)}
+.splash-sub{font-size:12px;letter-spacing:.2em;color:var(--muted);font-family:var(--mono);margin-bottom:48px}
+.splash-btn{padding:14px 40px;border:1.5px solid var(--accent);border-radius:999px;font-size:14px;font-family:var(--mono);color:var(--accent);cursor:pointer;background:transparent;transition:all .2s;letter-spacing:.1em}
+.splash-btn:hover{background:var(--accent);color:#fff}
+
+/* ── MAIN LAYOUT ── */
+#app{position:fixed;inset:0;display:none;flex-direction:column}
+#app.show{display:flex}
+
+/* ── HEADER ── */
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 8px;flex-shrink:0;border-bottom:0.5px solid var(--border)}
+.logo{font-size:20px;font-weight:800;letter-spacing:-1px}
+.logo span{color:var(--accent)}
+.header-right{display:flex;gap:12px;align-items:center}
+.rank-btn{font-size:11px;font-family:var(--mono);color:var(--muted);cursor:pointer;padding:5px 10px;border:0.5px solid var(--border);border-radius:6px;transition:all .2s}
+.rank-btn:hover{border-color:var(--accent);color:var(--accent)}
+.game-counter{font-size:11px;font-family:var(--mono);color:var(--muted)}
+
+/* ── FEED ── */
+#feed{flex:1;position:relative;overflow:hidden}
+
+/* ── GAME CARD ── */
+.game-card{position:absolute;inset:0;display:flex;flex-direction:column;transition:transform .4s cubic-bezier(.77,0,.18,1)}
+.game-card.above{transform:translateY(-100%)}
+.game-card.active{transform:translateY(0)}
+.game-card.below{transform:translateY(100%)}
+
+.game-area{flex:1;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+
+.game-hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;padding:10px 14px;pointer-events:none}
+.hud-score{font-size:13px;font-family:var(--mono);color:var(--green)}
+.hud-hi{font-size:11px;font-family:var(--mono);color:var(--muted)}
+
+.game-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,8,16,.85);gap:12px}
+.game-overlay.hidden{display:none}
+.overlay-title{font-size:22px;font-weight:800;letter-spacing:-1px}
+.overlay-sub{font-size:11px;font-family:var(--mono);color:var(--muted);letter-spacing:.1em}
+.overlay-score{font-size:36px;font-weight:800;color:var(--green);font-family:var(--mono)}
+.play-btn{padding:12px 32px;border:1.5px solid var(--accent);border-radius:999px;font-size:13px;font-family:var(--mono);color:var(--accent);cursor:pointer;background:transparent;transition:all .2s;pointer-events:all}
+.play-btn:hover{background:var(--accent);color:#fff}
+
+.game-info{padding:10px 14px 6px;background:var(--surface);flex-shrink:0}
+.game-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.game-title{font-size:15px;font-weight:700;letter-spacing:-.5px}
+.game-genre{font-size:10px;font-family:var(--mono);color:var(--accent);border:0.5px solid var(--accent);padding:2px 8px;border-radius:999px}
+.game-desc{font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.5}
+
+/* ── SIDEBAR ── */
+.sidebar{position:absolute;right:10px;bottom:100px;display:flex;flex-direction:column;gap:16px;align-items:center}
+.side-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.side-icon{width:38px;height:38px;border-radius:50%;border:0.5px solid var(--border);display:flex;align-items:center;justify-content:center;transition:all .2s;background:rgba(8,8,16,.6)}
+.side-item:hover .side-icon{border-color:var(--accent);background:rgba(124,109,255,.15)}
+.side-item.active .side-icon{border-color:var(--accent2);background:rgba(255,107,157,.15)}
+.side-label{font-size:9px;font-family:var(--mono);color:var(--muted)}
+svg.ico{width:16px;height:16px;fill:none;stroke:rgba(240,240,255,.7);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.side-item.active svg.ico{stroke:var(--accent2)}
+
+/* ── SWIPE HINT ── */
+.swipe-hint{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;animation:floatUp 2s ease-in-out infinite}
+@keyframes floatUp{0%,100%{opacity:.4;transform:translateX(-50%) translateY(0)}50%{opacity:.8;transform:translateX(-50%) translateY(-6px)}}
+.hint-arrow{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:9px solid rgba(255,255,255,.5)}
+.hint-text{font-size:9px;font-family:var(--mono);color:var(--muted);letter-spacing:.1em}
+
+/* ── NAV ── */
+.nav{height:56px;display:flex;align-items:center;justify-content:space-around;border-top:0.5px solid var(--border);background:var(--surface);flex-shrink:0}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:6px 16px;border-radius:8px;transition:background .2s}
+.nav-item:hover{background:rgba(255,255,255,.04)}
+.nav-item.active svg.ico{stroke:var(--accent)}
+.nav-item.active .nav-label{color:var(--accent)}
+.nav-label{font-size:9px;font-family:var(--mono);color:var(--muted)}
+
+/* ── RANKING PANEL ── */
+#rankPanel{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:flex-end}
+#rankPanel.show{display:flex}
+.rank-sheet{width:100%;background:var(--surface);border-radius:20px 20px 0 0;padding:20px 16px 32px;max-height:70vh;overflow-y:auto}
+.rank-handle{width:36px;height:3px;background:var(--border);border-radius:999px;margin:0 auto 16px}
+.rank-title{font-size:17px;font-weight:800;margin-bottom:4px}
+.rank-sub{font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:16px}
+.rank-tabs{display:flex;gap:8px;margin-bottom:16px}
+.rank-tab{font-size:11px;font-family:var(--mono);padding:5px 12px;border-radius:999px;border:0.5px solid var(--border);cursor:pointer;transition:all .2s;color:var(--muted)}
+.rank-tab.active{border-color:var(--accent);color:var(--accent);background:rgba(124,109,255,.1)}
+.rank-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.rank-pos{font-size:13px;font-family:var(--mono);color:var(--muted);width:20px;text-align:center}
+.rank-pos.top{color:var(--green)}
+.rank-name{flex:1;font-size:13px;font-family:var(--mono)}
+.rank-val{font-size:14px;font-weight:700;font-family:var(--mono);color:var(--green)}
+.rank-badge{font-size:14px;margin-left:4px}
+.rank-me{background:rgba(124,109,255,.08);border-radius:6px;padding:0 6px;margin:-2px -6px}
+.rank-close{width:100%;margin-top:16px;padding:12px;border:0.5px solid var(--border);border-radius:10px;font-size:13px;font-family:var(--mono);color:var(--muted);cursor:pointer;background:transparent;transition:all .2s}
+.rank-close:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── TOAST ── */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-60px);background:var(--accent);color:#fff;font-size:12px;font-family:var(--mono);padding:8px 20px;border-radius:999px;z-index:200;transition:transform .3s;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ── CONTROLS HINT ── */
+.ctrl-hint{position:absolute;bottom:14px;left:14px;font-size:9px;font-family:var(--mono);color:rgba(255,255,255,.2);line-height:1.8;pointer-events:none}
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-logo">Play<span>Drift</span></div>
+  <div class="splash-sub">プレドリ — ヒマゲーTikTok</div>
+  <button class="splash-btn" onclick="startApp()">▶ はじめる</button>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header class="header">
+    <div class="logo">Play<span>Drift</span></div>
+    <div class="header-right">
+      <div class="rank-btn" onclick="openRank()">🏆 ランキング</div>
+      <div class="game-counter" id="gameCounter">1 / 4</div>
+    </div>
+  </header>
+
+  <div id="feed">
+    <!-- cards injected by JS -->
+    <div class="swipe-hint" id="swipeHint">
+      <div class="hint-arrow"></div>
+      <div class="hint-text">SWIPE UP</div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-item active">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span class="nav-label">ホーム</span>
+    </div>
+    <div class="nav-item" onclick="showToast('検索は近日公開！')">
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span class="nav-label">さがす</span>
+    </div>
+    <div class="nav-item" onclick="openRank()">
+      <svg class="ico" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span class="nav-label">ランキング</span>
+    </div>
+    <div class="nav-item" onclick="showToast('プロフィールは近日公開！')">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span class="nav-label">マイページ</span>
+    </div>
+  </nav>
+</div>
+
+<!-- RANKING PANEL -->
+<div id="rankPanel" onclick="closeRankOutside(event)">
+  <div class="rank-sheet" id="rankSheet">
+    <div class="rank-handle"></div>
+    <div class="rank-title">🏆 スコアランキング</div>
+    <div class="rank-sub" id="rankSubTitle">全ゲーム</div>
+    <div class="rank-tabs" id="rankTabs"></div>
+    <div id="rankList"></div>
+    <button class="rank-close" onclick="closeRank()">閉じる</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════
+// GAME DEFINITIONS
+// ══════════════════════════════════
+const GAMES = [
+  {
+    id: 'snake',
+    title: 'スネーク',
+    genre: 'クラシック',
+    desc: '矢印キー or スワイプで操作。リンゴを食べてスコアを稼げ！',
+    bg: '#001a0a',
+    accentColor: '#00ffaa',
+    controls: '← → ↑ ↓ or スワイプ',
+    init: initSnake,
+    start: startSnake,
+    stop: stopSnake,
+  },
+  {
+    id: 'shooter',
+    title: 'スペースシューター',
+    genre: 'シューティング',
+    desc: '左右に動いて敵を避けながら倒せ！タップで弾発射。',
+    bg: '#00061a',
+    accentColor: '#7c6dff',
+    controls: '← → or タップ左右 / スペースで発射',
+    init: initShooter,
+    start: startShooter,
+    stop: stopShooter,
+  },
+  {
+    id: 'dodge',
+    title: 'ドッジ',
+    genre: '避けゲー',
+    desc: '降り注ぐ障害物を避け続けろ！当たったら即終了。',
+    bg: '#1a000a',
+    accentColor: '#ff6b9d',
+    controls: '← → or タップで移動',
+    init: initDodge,
+    start: startDodge,
+    stop: stopDodge,
+  },
+  {
+    id: 'block',
+    title: 'ブロック崩し',
+    genre: 'アクション',
+    desc: 'バーを動かしてボールでブロックを全部壊せ！',
+    bg: '#0a0a00',
+    accentColor: '#ffd700',
+    controls: '← → or タップ左右',
+    init: initBlock,
+    start: startBlock,
+    stop: stopBlock,
+  },
+];
+
+// ══════════════════════════════════
+// STATE
+// ══════════════════════════════════
+let currentIdx = 0;
+let cards = [];
+let dragging = false, startY = 0, liked = {}, saved = {};
+let scores = JSON.parse(localStorage.getItem('pd_scores') || '{}');
+let hiScores = JSON.parse(localStorage.getItem('pd_hi') || '{}');
+
+function saveScores(){localStorage.setItem('pd_scores',JSON.stringify(scores));localStorage.setItem('pd_hi',JSON.stringify(hiScores));}
+
+// ══════════════════════════════════
+// APP INIT
+// ══════════════════════════════════
+function startApp(){
+  document.getElementById('splash').classList.add('hide');
+  document.getElementById('app').classList.add('show');
+  buildFeed();
+  setTimeout(()=>{ document.getElementById('swipeHint').style.opacity='0'; },4000);
+}
+
+function buildFeed(){
+  const feed = document.getElementById('feed');
+  GAMES.forEach((g,i)=>{
+    const card = createCard(g,i);
+    feed.appendChild(card);
+    cards.push(card);
+  });
+  updatePositions();
+  activateGame(0);
+  setupSwipe();
+}
+
+function createCard(g, idx){
+  const card = document.createElement('div');
+  card.className = 'game-card below';
+  card.dataset.idx = idx;
+  card.innerHTML = `
+    <div class="game-area" style="background:${g.bg}">
+      <canvas id="canvas_${g.id}"></canvas>
+      <div class="game-hud">
+        <div class="hud-score" id="score_${g.id}">SCORE: 0</div>
+        <div class="hud-hi" id="hi_${g.id}">BEST: ${hiScores[g.id]||0}</div>
+      </div>
+      <div class="game-overlay" id="overlay_${g.id}">
+        <div class="overlay-title">${g.title}</div>
+        <div class="overlay-sub">${g.genre}</div>
+        <div class="overlay-score" id="overlayScore_${g.id}"></div>
+        <button class="play-btn" onclick="startGame('${g.id}')">▶ PLAY</button>
+      </div>
+      <div class="ctrl-hint">${g.controls}</div>
+    </div>
+    <div class="game-info">
+      <div class="game-title-row">
+        <div class="game-title">${g.title}</div>
+        <div class="game-genre">${g.genre}</div>
+      </div>
+      <div class="game-desc">${g.desc}</div>
+    </div>
+    <div class="sidebar">
+      <div class="side-item ${liked[g.id]?'active':''}" id="like_${g.id}" onclick="toggleLike('${g.id}')">
+        <div class="side-icon"><svg class="ico" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg></div>
+        <span class="side-label" id="likeCount_${g.id}">${(Math.random()*3+.5).toFixed(1)}k</span>
+      </div>
+      <div class="side-item" onclick="shareGame('${g.id}')">
+        <div class="side-icon"><svg class="ico" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
+        <span class="side-label">share</span>
+      </div>
+      <div class="side-item ${saved[g.id]?'active':''}" id="save_${g.id}" onclick="toggleSave('${g.id}')">
+        <div class="side-icon"><svg class="ico" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg></div>
+        <span class="side-label">save</span>
+      </div>
+    </div>`;
+  return card;
+}
+
+function updatePositions(){
+  cards.forEach((c,i)=>{
+    c.className = 'game-card ' + (i < currentIdx ? 'above' : i === currentIdx ? 'active' : 'below');
+  });
+  document.getElementById('gameCounter').textContent = `${currentIdx+1} / ${GAMES.length}`;
+}
+
+function goTo(idx){
+  if(idx < 0 || idx >= GAMES.length) return;
+  stopCurrentGame();
+  currentIdx = idx;
+  updatePositions();
+  activateGame(idx);
+}
+
+// ══════════════════════════════════
+// SWIPE
+// ══════════════════════════════════
+function setupSwipe(){
+  const feed = document.getElementById('feed');
+  feed.addEventListener('touchstart', e=>{ startY=e.touches[0].clientY; }, {passive:true});
+  feed.addEventListener('touchend', e=>{
+    const dy = startY - e.changedTouches[0].clientY;
+    if(Math.abs(dy)>50){ dy>0 ? goTo(currentIdx+1) : goTo(currentIdx-1); }
+  }, {passive:true});
+  document.addEventListener('keydown', e=>{
+    if(e.key==='ArrowUp') goTo(currentIdx-1);
+    if(e.key==='ArrowDown') goTo(currentIdx+1);
+  });
+}
+
+// ══════════════════════════════════
+// GAME CONTROL
+// ══════════════════════════════════
+const gameHandles = {};
+
+function activateGame(idx){
+  const g = GAMES[idx];
+  const canvas = document.getElementById('canvas_'+g.id);
+  const area = canvas.parentElement;
+  canvas.width = area.clientWidth;
+  canvas.height = area.clientHeight;
+  g.init(canvas);
+}
+
+function startGame(id){
+  const g = GAMES.find(x=>x.id===id);
+  const overlay = document.getElementById('overlay_'+id);
+  overlay.classList.add('hidden');
+  g.start();
+}
+
+function stopCurrentGame(){
+  const g = GAMES[currentIdx];
+  if(g) g.stop();
+}
+
+function updateScore(id, s){
+  scores[id] = s;
+  if(!hiScores[id]||s>hiScores[id]) hiScores[id]=s;
+  saveScores();
+  document.getElementById('score_'+id).textContent = 'SCORE: '+s;
+  document.getElementById('hi_'+id).textContent = 'BEST: '+hiScores[id];
+}
+
+function gameOver(id, finalScore){
+  const g = GAMES.find(x=>x.id===id);
+  g.stop();
+  const overlay = document.getElementById('overlay_'+id);
+  overlay.classList.remove('hidden');
+  overlay.querySelector('.overlay-title').textContent = 'GAME OVER';
+  overlay.querySelector('.overlay-sub').textContent = `BEST: ${hiScores[id]||0}`;
+  const sc = overlay.querySelector('.overlay-score');
+  sc.textContent = finalScore;
+  sc.style.display = 'block';
+}
+
+// ══════════════════════════════════
+// SNAKE
+// ══════════════════════════════════
+let snakeTimer, snakeState;
+function initSnake(canvas){
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle='#001a0a';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='rgba(0,255,170,.15)';
+  const sz=20;
+  for(let x=0;x<canvas.width;x+=sz) for(let y=0;y<canvas.height;y+=sz) ctx.strokeRect(x,y,sz,sz);
+  ctx.fillStyle='#00ffaa';ctx.font='bold 14px "Space Mono"';
+  ctx.textAlign='center';ctx.fillText('TAP PLAY TO START',canvas.width/2,canvas.height/2);
+}
+function startSnake(){
+  const canvas=document.getElementById('canvas_snake');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height,SZ=20;
+  const cols=Math.floor(W/SZ),rows=Math.floor(H/SZ);
+  let snake=[{x:Math.floor(cols/2),y:Math.floor(rows/2)}];
+  let dir={x:1,y:0},nextDir={x:1,y:0};
+  let food=randFood();let score=0;
+  function randFood(){return{x:Math.floor(Math.random()*cols),y:Math.floor(Math.random()*rows)};}
+  function draw(){
+    ctx.fillStyle='#001a0a';ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='rgba(0,255,170,.06)';ctx.lineWidth=.5;
+    for(let x=0;x<W;x+=SZ){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=SZ){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    ctx.fillStyle='#ff4466';ctx.beginPath();ctx.arc(food.x*SZ+SZ/2,food.y*SZ+SZ/2,SZ/2-2,0,Math.PI*2);ctx.fill();
+    snake.forEach((s,i)=>{
+      ctx.fillStyle=i===0?'#00ffaa':'rgba(0,255,170,.6)';
+      ctx.fillRect(s.x*SZ+1,s.y*SZ+1,SZ-2,SZ-2);
+    });
+  }
+  function tick(){
+    dir=nextDir;
+    const head={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
+    if(head.x<0||head.x>=cols||head.y<0||head.y>=rows||snake.some(s=>s.x===head.x&&s.y===head.y)){gameOver('snake',score);return;}
+    snake.unshift(head);
+    if(head.x===food.x&&head.y===food.y){score+=10;food=randFood();updateScore('snake',score);}
+    else snake.pop();
+    draw();
+    snakeTimer=setTimeout(tick,120);
+  }
+  // キー操作
+  function onKey(e){
+    const m={'ArrowUp':{x:0,y:-1},'ArrowDown':{x:0,y:1},'ArrowLeft':{x:-1,y:0},'ArrowRight':{x:1,y:0}};
+    if(m[e.key]&&!(m[e.key].x===-dir.x&&m[e.key].y===-dir.y)){nextDir=m[e.key];e.preventDefault();}
+  }
+  document.addEventListener('keydown',onKey);
+  // スワイプ操作
+  let ts={x:0,y:0};
+  canvas.addEventListener('touchstart',e=>{ts={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:true});
+  canvas.addEventListener('touchend',e=>{
+    const dx=e.changedTouches[0].clientX-ts.x,dy=e.changedTouches[0].clientY-ts.y;
+    if(Math.abs(dx)>Math.abs(dy)){nextDir=dx>0?{x:1,y:0}:{x:-1,y:0};}
+    else{nextDir=dy>0?{x:0,y:1}:{x:0,y:-1};}
+  },{passive:true});
+  gameHandles.snake={onKey};
+  tick();
+}
+function stopSnake(){clearTimeout(snakeTimer);if(gameHandles.snake)document.removeEventListener('keydown',gameHandles.snake.onKey);}
+
+// ══════════════════════════════════
+// SHOOTER
+// ══════════════════════════════════
+let shooterRAF;
+function initShooter(canvas){
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#00061a';ctx.fillRect(0,0,canvas.width,canvas.height);
+  // stars
+  for(let i=0;i<60;i++){ctx.fillStyle=`rgba(255,255,255,${Math.random()*.8+.2})`;ctx.fillRect(Math.random()*canvas.width,Math.random()*canvas.height,1,1);}
+  ctx.fillStyle='#7c6dff';ctx.font='bold 14px "Space Mono"';ctx.textAlign='center';
+  ctx.fillText('TAP PLAY TO START',canvas.width/2,canvas.height/2);
+}
+function startShooter(){
+  const canvas=document.getElementById('canvas_shooter');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  let px=W/2,py=H-60,speed=4;
+  let bullets=[],enemies=[],particles=[];
+  let score=0,frame=0,keys={};
+  // stars
+  const stars=Array.from({length:80},()=>({x:Math.random()*W,y:Math.random()*H,s:Math.random()*1.5+.3,sp:Math.random()*.5+.2}));
+  let touchX=null;
+  function spawnEnemy(){
+    enemies.push({x:Math.random()*(W-30)+15,y:-20,w:28,h:20,hp:1,spd:Math.random()*1.5+.8,col:`hsl(${Math.random()*60+200},80%,60%)`});
+  }
+  function shoot(){bullets.push({x:px,y:py-20});}
+  function onKey(e){
+    keys[e.key]=e.type==='keydown';
+    if(e.key===' '&&e.type==='keydown'){shoot();e.preventDefault();}
+    if(['ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();
+  }
+  document.addEventListener('keydown',onKey);document.addEventListener('keyup',onKey);
+  canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;shoot();},{passive:true});
+  canvas.addEventListener('touchmove',e=>{touchX=e.touches[0].clientX;},{passive:true});
+  canvas.addEventListener('touchend',()=>{touchX=null;},{passive:true});
+  // auto shoot
+  let autoShoot=setInterval(shoot,400);
+  function draw(){
+    ctx.fillStyle='#00061a';ctx.fillRect(0,0,W,H);
+    stars.forEach(s=>{s.y+=s.sp;if(s.y>H)s.y=0;ctx.fillStyle='rgba(255,255,255,.6)';ctx.fillRect(s.x,s.y,s.s,s.s);});
+    // bullets
+    bullets=bullets.filter(b=>{b.y-=10;ctx.fillStyle='#00ffaa';ctx.fillRect(b.x-2,b.y,4,12);return b.y>0;});
+    // enemies
+    enemies=enemies.filter(en=>{
+      en.y+=en.spd;
+      ctx.fillStyle=en.col;ctx.beginPath();ctx.moveTo(en.x,en.y+en.h);ctx.lineTo(en.x-en.w/2,en.y);ctx.lineTo(en.x+en.w/2,en.y);ctx.closePath();ctx.fill();
+      // hit?
+      bullets=bullets.filter(b=>{
+        if(Math.abs(b.x-en.x)<en.w/2&&Math.abs(b.y-en.y)<en.h){
+          score+=10;updateScore('shooter',score);
+          for(let i=0;i<8;i++)particles.push({x:en.x,y:en.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-2)*4,life:1,col:en.col});
+          en.hp--;return false;
+        }return true;
+      });
+      if(en.y>H+20){gameOver('shooter',score);return false;}
+      if(en.hp<=0)return false;
+      // collision with player
+      if(Math.abs(en.x-px)<en.w/2+15&&Math.abs(en.y-py)<en.h+15){gameOver('shooter',score);return false;}
+      return true;
+    });
+    // particles
+    particles=particles.filter(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.15;p.life-=.05;ctx.globalAlpha=p.life;ctx.fillStyle=p.col;ctx.fillRect(p.x-2,p.y-2,4,4);ctx.globalAlpha=1;return p.life>0;});
+    // player
+    ctx.fillStyle='#7c6dff';
+    ctx.beginPath();ctx.moveTo(px,py-20);ctx.lineTo(px-18,py+16);ctx.lineTo(px+18,py+16);ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(124,109,255,.3)';ctx.beginPath();ctx.moveTo(px-8,py+16);ctx.lineTo(px,py+28);ctx.lineTo(px+8,py+16);ctx.closePath();ctx.fill();
+    frame++;
+    if(frame%60===0)spawnEnemy();
+    if(keys['ArrowLeft']||touchX<W/2){px=Math.max(20,px-speed);}
+    if(keys['ArrowRight']||touchX>W/2){px=Math.min(W-20,px+speed);}
+    shooterRAF=requestAnimationFrame(draw);
+  }
+  gameHandles.shooter={onKey,autoShoot};
+  draw();
+}
+function stopShooter(){cancelAnimationFrame(shooterRAF);if(gameHandles.shooter){document.removeEventListener('keydown',gameHandles.shooter.onKey);document.removeEventListener('keyup',gameHandles.shooter.onKey);clearInterval(gameHandles.shooter.autoShoot);}}
+
+// ══════════════════════════════════
+// DODGE
+// ══════════════════════════════════
+let dodgeRAF;
+function initDodge(canvas){
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#1a000a';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#ff6b9d';ctx.font='bold 14px "Space Mono"';ctx.textAlign='center';
+  ctx.fillText('TAP PLAY TO START',canvas.width/2,canvas.height/2);
+}
+function startDodge(){
+  const canvas=document.getElementById('canvas_dodge');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  let px=W/2,py=H-50,score=0,frame=0,speed=3;
+  let obstacles=[],keys={},touchX=null;
+  function onKey(e){keys[e.key]=e.type==='keydown';if(['ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();}
+  document.addEventListener('keydown',onKey);document.addEventListener('keyup',onKey);
+  canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;},{passive:true});
+  canvas.addEventListener('touchmove',e=>{touchX=e.touches[0].clientX;},{passive:true});
+  canvas.addEventListener('touchend',()=>{touchX=null;},{passive:true});
+  function spawnObs(){
+    const w=Math.random()*50+20;
+    obstacles.push({x:Math.random()*(W-w),y:-30,w,h:18,spd:speed+Math.random()*2,col:`hsl(${Math.random()*40+330},80%,55%)`});
+  }
+  function draw(){
+    ctx.fillStyle='#1a000a';ctx.fillRect(0,0,W,H);
+    // grid
+    ctx.strokeStyle='rgba(255,107,157,.05)';ctx.lineWidth=.5;
+    for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    // obstacles
+    obstacles=obstacles.filter(o=>{
+      o.y+=o.spd;
+      ctx.fillStyle=o.col;ctx.beginPath();ctx.roundRect(o.x,o.y,o.w,o.h,4);ctx.fill();
+      if(o.x<px+14&&o.x+o.w>px-14&&o.y<py+14&&o.y+o.h>py-14){gameOver('dodge',score);return false;}
+      return o.y<H+30;
+    });
+    // player
+    ctx.fillStyle='#ff6b9d';
+    ctx.beginPath();ctx.arc(px,py,13,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(px-4,py-3,3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ff6b9d';ctx.beginPath();ctx.arc(px-4,py-3,1.5,0,Math.PI*2);ctx.fill();
+    frame++;score=Math.floor(frame/6);updateScore('dodge',score);
+    if(frame%50===0){spawnObs();if(frame%300===0)speed+=.3;}
+    if(keys['ArrowLeft']||touchX<W/2){px=Math.max(14,px-4);}
+    if(keys['ArrowRight']||touchX>W/2){px=Math.min(W-14,px+4);}
+    dodgeRAF=requestAnimationFrame(draw);
+  }
+  gameHandles.dodge={onKey};
+  draw();
+}
+function stopDodge(){cancelAnimationFrame(dodgeRAF);if(gameHandles.dodge){document.removeEventListener('keydown',gameHandles.dodge.onKey);document.removeEventListener('keyup',gameHandles.dodge.onKey);}}
+
+// ══════════════════════════════════
+// BLOCK BREAKER
+// ══════════════════════════════════
+let blockRAF;
+function initBlock(canvas){
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#0a0a00';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#ffd700';ctx.font='bold 14px "Space Mono"';ctx.textAlign='center';
+  ctx.fillText('TAP PLAY TO START',canvas.width/2,canvas.height/2);
+}
+function startBlock(){
+  const canvas=document.getElementById('canvas_block');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  let padW=70,padH=10,padX=W/2-35,padY=H-30;
+  let ball={x:W/2,y:H-50,vx:3,vy:-4,r:8};
+  let score=0,keys={},touchX=null;
+  const cols=6,rows=4,bW=Math.floor((W-20)/cols)-4,bH=22;
+  let blocks=[];
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    blocks.push({x:10+c*(bW+4),y:50+r*(bH+4),w:bW,h:bH,alive:true,col:`hsl(${r*30+30},80%,55%)`});
+  }
+  function onKey(e){keys[e.key]=e.type==='keydown';if(['ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();}
+  document.addEventListener('keydown',onKey);document.addEventListener('keyup',onKey);
+  canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;},{passive:true});
+  canvas.addEventListener('touchmove',e=>{touchX=e.touches[0].clientX;},{passive:true});
+  canvas.addEventListener('touchend',()=>{touchX=null;},{passive:true});
+  function draw(){
+    ctx.fillStyle='#0a0a00';ctx.fillRect(0,0,W,H);
+    // blocks
+    blocks.filter(b=>b.alive).forEach(b=>{
+      ctx.fillStyle=b.col;ctx.beginPath();ctx.roundRect(b.x,b.y,b.w,b.h,3);ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,.3)';ctx.strokeRect(b.x,b.y,b.w,b.h);
+      if(ball.x>b.x&&ball.x<b.x+b.w&&ball.y-ball.r<b.y+b.h&&ball.y+ball.r>b.y){
+        b.alive=false;ball.vy*=-1;score+=10;updateScore('block',score);
+        if(!blocks.some(x=>x.alive)){gameOver('block',score);}
+      }
+    });
+    // pad
+    if(keys['ArrowLeft']||touchX<W/2){padX=Math.max(0,padX-6);}
+    if(keys['ArrowRight']||touchX>W/2){padX=Math.min(W-padW,padX+6);}
+    ctx.fillStyle='#ffd700';ctx.beginPath();ctx.roundRect(padX,padY,padW,padH,5);ctx.fill();
+    // ball
+    ball.x+=ball.vx;ball.y+=ball.vy;
+    if(ball.x-ball.r<0||ball.x+ball.r>W)ball.vx*=-1;
+    if(ball.y-ball.r<0)ball.vy*=-1;
+    if(ball.y+ball.r>padY&&ball.y+ball.r<padY+padH+10&&ball.x>padX-5&&ball.x<padX+padW+5){
+      ball.vy=-(Math.abs(ball.vy));ball.vx+=((ball.x-(padX+padW/2))/padW)*3;
+    }
+    if(ball.y>H+20){gameOver('block',score);return;}
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,215,0,.3)';ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r+4,0,Math.PI*2);ctx.fill();
+    blockRAF=requestAnimationFrame(draw);
+  }
+  gameHandles.block={onKey};
+  draw();
+}
+function stopBlock(){cancelAnimationFrame(blockRAF);if(gameHandles.block){document.removeEventListener('keydown',gameHandles.block.onKey);document.removeEventListener('keyup',gameHandles.block.onKey);}}
+
+// ══════════════════════════════════
+// RANKING
+// ══════════════════════════════════
+const DUMMY = {
+  snake:[{n:'ケンタ',s:340},{n:'ユキ',s:280},{n:'ハル',s:210},{n:'ソウタ',s:170},{n:'リオ',s:120}],
+  shooter:[{n:'アキラ',s:580},{n:'ノア',s:460},{n:'ミサキ',s:390},{n:'カイ',s:310},{n:'ルカ',s:250}],
+  dodge:[{n:'ユイ',s:412},{n:'レン',s:370},{n:'サクラ',s:290},{n:'コウ',s:220},{n:'ナナ',s:180}],
+  block:[{n:'ツバサ',s:720},{n:'ヒナ',s:640},{n:'アオイ',s:530},{n:'ケイ',s:420},{n:'マイ',s:360}],
+};
+let rankGame='snake';
+function openRank(){
+  document.getElementById('rankPanel').classList.add('show');
+  renderRank();
+}
+function closeRank(){document.getElementById('rankPanel').classList.remove('show');}
+function closeRankOutside(e){if(e.target===document.getElementById('rankPanel'))closeRank();}
+function renderRank(){
+  const tabs=document.getElementById('rankTabs');
+  tabs.innerHTML=GAMES.map(g=>`<div class="rank-tab ${g.id===rankGame?'active':''}" onclick="switchRank('${g.id}')">${g.title}</div>`).join('');
+  document.getElementById('rankSubTitle').textContent=GAMES.find(g=>g.id===rankGame).title+' ランキング';
+  const list=document.getElementById('rankList');
+  const rows=[...DUMMY[rankGame]];
+  const myScore=hiScores[rankGame]||0;
+  if(myScore>0){
+    const myRank=rows.filter(r=>r.s>myScore).length+1;
+    rows.splice(myRank-1,0,{n:'あなた',s:myScore,me:true});
+  }
+  const medals=['🥇','🥈','🥉'];
+  list.innerHTML=rows.slice(0,8).map((r,i)=>`
+    <div class="rank-row ${r.me?'rank-me':''}">
+      <div class="rank-pos ${i<3?'top':''}">${medals[i]||i+1}</div>
+      <div class="rank-name">${r.n}${r.me?' (あなた)':''}</div>
+      <div class="rank-val">${r.s}<span class="rank-badge"></span></div>
+    </div>`).join('');
+}
+function switchRank(id){rankGame=id;renderRank();}
+
+// ══════════════════════════════════
+// SOCIAL
+// ══════════════════════════════════
+function toggleLike(id){
+  liked[id]=!liked[id];
+  const el=document.getElementById('like_'+id);
+  el.classList.toggle('active',liked[id]);
+  showToast(liked[id]?'いいね！':'いいねを取り消した');
+}
+function toggleSave(id){
+  saved[id]=!saved[id];
+  const el=document.getElementById('save_'+id);
+  el.classList.toggle('active',saved[id]);
+  showToast(saved[id]?'セーブした！':'セーブを取り消した');
+}
+function shareGame(id){
+  const g=GAMES.find(x=>x.id===id);
+  if(navigator.share){navigator.share({title:'PlayDrift - '+g.title,text:`PlayDriftで${g.title}を遊んでる！スコア: ${hiScores[id]||0}`,url:location.href});}
+  else{navigator.clipboard.writeText(location.href).then(()=>showToast('URLをコピーした！'));}
+}
+
+// ══════════════════════════════════
+// TOAST
+// ══════════════════════════════════
+let toastTimer;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2000);
+}
+</script>
+</body>
+</html>
