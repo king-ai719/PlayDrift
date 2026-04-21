@@ -124,6 +124,10 @@ svg.ico{width:16px;height:16px;fill:none;stroke:rgba(240,240,255,.7);stroke-widt
 
 /* ── CONTROLS HINT ── */
 .ctrl-hint{position:absolute;bottom:14px;left:14px;font-size:9px;font-family:var(--mono);color:rgba(255,255,255,.2);line-height:1.8;pointer-events:none}
+.ctrl-btns{position:absolute;bottom:10px;left:0;right:0;display:none;justify-content:space-between;padding:0 20px;pointer-events:none}
+.ctrl-btns.show{display:flex}
+.ctrl-btn{width:70px;height:48px;border-radius:12px;background:rgba(255,255,255,.12);border:0.5px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;pointer-events:all;user-select:none;-webkit-user-select:none}
+.ctrl-btn:active{background:rgba(255,255,255,.28)}
 </style>
 </head>
 <body>
@@ -294,6 +298,10 @@ function createCard(g, idx){
         <button class="play-btn" onclick="startGame('${g.id}')">▶ PLAY</button>
       </div>
       <div class="ctrl-hint">${g.controls}</div>
+      <div class="ctrl-btns" id="ctrlBtns_${g.id}">
+        <div class="ctrl-btn" id="btnL_${g.id}">◀</div>
+        <div class="ctrl-btn" id="btnR_${g.id}">▶</div>
+      </div>
     </div>
     <div class="game-info">
       <div class="game-title-row">
@@ -355,6 +363,34 @@ function setupSwipe(){
 }
 
 // ══════════════════════════════════
+// BUTTON CONTROLS (共通左右ボタン)
+// ══════════════════════════════════
+const btnState = {left: false, right: false};
+
+function setupCtrlBtns(id) {
+  const btnL = document.getElementById('btnL_'+id);
+  const btnR = document.getElementById('btnR_'+id);
+  if(!btnL||!btnR) return;
+  ['pointerdown','touchstart'].forEach(ev=>{
+    btnL.addEventListener(ev, e=>{e.preventDefault();btnState.left=true;}, {passive:false});
+    btnR.addEventListener(ev, e=>{e.preventDefault();btnState.right=true;}, {passive:false});
+  });
+  ['pointerup','pointerleave','touchend','touchcancel'].forEach(ev=>{
+    btnL.addEventListener(ev, ()=>{btnState.left=false;});
+    btnR.addEventListener(ev, ()=>{btnState.right=false;});
+  });
+}
+
+function showCtrlBtns(id) {
+  document.getElementById('ctrlBtns_'+id).classList.add('show');
+}
+function hideCtrlBtns(id) {
+  const el = document.getElementById('ctrlBtns_'+id);
+  if(el) el.classList.remove('show');
+  btnState.left=false; btnState.right=false;
+}
+
+// ══════════════════════════════════
 // GAME CONTROL
 // ══════════════════════════════════
 const gameHandles = {};
@@ -366,6 +402,7 @@ function activateGame(idx){
   canvas.width = area.clientWidth;
   canvas.height = area.clientHeight;
   g.init(canvas);
+  setupCtrlBtns(g.id);
 }
 
 function startGame(id){
@@ -373,12 +410,13 @@ function startGame(id){
   const overlay = document.getElementById('overlay_'+id);
   overlay.classList.add('hidden');
   gameActive = true;
+  if(id !== 'snake') showCtrlBtns(id);
   g.start();
 }
 
 function stopCurrentGame(){
   const g = GAMES[currentIdx];
-  if(g) g.stop();
+  if(g){ hideCtrlBtns(g.id); g.stop(); }
   gameActive = false;
 }
 
@@ -392,6 +430,7 @@ function updateScore(id, s){
 
 function gameOver(id, finalScore){
   const g = GAMES.find(x=>x.id===id);
+  hideCtrlBtns(id);
   g.stop();
   gameActive = false;
   const overlay = document.getElementById('overlay_'+id);
@@ -487,9 +526,7 @@ function startShooter(){
   let px=W/2,py=H-60,speed=4;
   let bullets=[],enemies=[],particles=[];
   let score=0,frame=0,keys={};
-  // stars
   const stars=Array.from({length:80},()=>({x:Math.random()*W,y:Math.random()*H,s:Math.random()*1.5+.3,sp:Math.random()*.5+.2}));
-  let touchX=null;
   function spawnEnemy(){
     enemies.push({x:Math.random()*(W-30)+15,y:-20,w:28,h:20,hp:1,spd:Math.random()*1.5+.8,col:`hsl(${Math.random()*60+200},80%,60%)`});
   }
@@ -500,10 +537,7 @@ function startShooter(){
     if(['ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();
   }
   document.addEventListener('keydown',onKey);document.addEventListener('keyup',onKey);
-  let touchBaseX=null;
-  canvas.addEventListener('touchstart',e=>{touchBaseX=e.touches[0].clientX;touchX=null;shoot();e.stopPropagation();},{passive:true});
-  canvas.addEventListener('touchmove',e=>{e.stopPropagation();const dx=e.touches[0].clientX-touchBaseX;if(dx>15)touchX=W;else if(dx<-15)touchX=0;else touchX=null;},{passive:true});
-  canvas.addEventListener('touchend',e=>{touchX=null;touchBaseX=null;e.stopPropagation();},{passive:true});
+
   // auto shoot
   let autoShoot=setInterval(shoot,400);
   function draw(){
@@ -537,8 +571,8 @@ function startShooter(){
     ctx.fillStyle='rgba(124,109,255,.3)';ctx.beginPath();ctx.moveTo(px-8,py+16);ctx.lineTo(px,py+28);ctx.lineTo(px+8,py+16);ctx.closePath();ctx.fill();
     frame++;
     if(frame%60===0)spawnEnemy();
-    if(keys['ArrowLeft']||(touchX!==null&&touchX<W/2)){px=Math.max(20,px-speed);}
-    if(keys['ArrowRight']||(touchX!==null&&touchX>W/2)){px=Math.min(W-20,px+speed);}
+    if(keys['ArrowLeft']||btnState.left){px=Math.max(20,px-speed);}
+    if(keys['ArrowRight']||btnState.right){px=Math.min(W-20,px+speed);}
     shooterRAF=requestAnimationFrame(draw);
   }
   gameHandles.shooter={onKey,autoShoot};
@@ -561,13 +595,9 @@ function startDodge(){
   const ctx=canvas.getContext('2d');
   const W=canvas.width,H=canvas.height;
   let px=W/2,py=H-50,score=0,frame=0,speed=3;
-  let obstacles=[],keys={},touchX=null;
+  let obstacles=[],keys={};
   function onKey(e){keys[e.key]=e.type==='keydown';if(['ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();}
   document.addEventListener('keydown',onKey);document.addEventListener('keyup',onKey);
-  let touchBaseX=null;
-  canvas.addEventListener('touchstart',e=>{touchBaseX=e.touches[0].clientX;touchX=null;e.stopPropagation();},{passive:true});
-  canvas.addEventListener('touchmove',e=>{e.stopPropagation();const dx=e.touches[0].clientX-touchBaseX;if(dx>15)touchX=W;else if(dx<-15)touchX=0;else touchX=null;},{passive:true});
-  canvas.addEventListener('touchend',e=>{touchX=null;touchBaseX=null;e.stopPropagation();},{passive:true});
   function spawnObs(){
     const w=Math.random()*50+20;
     obstacles.push({x:Math.random()*(W-w),y:-30,w,h:18,spd:speed+Math.random()*2,col:`hsl(${Math.random()*40+330},80%,55%)`});
@@ -592,8 +622,8 @@ function startDodge(){
     ctx.fillStyle='#ff6b9d';ctx.beginPath();ctx.arc(px-4,py-3,1.5,0,Math.PI*2);ctx.fill();
     frame++;score=Math.floor(frame/6);updateScore('dodge',score);
     if(frame%50===0){spawnObs();if(frame%300===0)speed+=.3;}
-    if(keys['ArrowLeft']||(touchX!==null&&touchX<W/2)){px=Math.max(14,px-4);}
-    if(keys['ArrowRight']||(touchX!==null&&touchX>W/2)){px=Math.min(W-14,px+4);}
+    if(keys['ArrowLeft']||btnState.left){px=Math.max(14,px-4);}
+    if(keys['ArrowRight']||btnState.right){px=Math.min(W-14,px+4);}
     dodgeRAF=requestAnimationFrame(draw);
   }
   gameHandles.dodge={onKey};
@@ -617,7 +647,7 @@ function startBlock(){
   const W=canvas.width,H=canvas.height;
   let padW=70,padH=10,padX=W/2-35,padY=H-30;
   let ball={x:W/2,y:H-50,vx:3,vy:-4,r:8};
-  let score=0,keys={},touchX=null;
+  let score=0,keys={};
   const cols=6,rows=4,bW=Math.floor((W-20)/cols)-4,bH=22;
   let blocks=[];
   for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
@@ -625,10 +655,7 @@ function startBlock(){
   }
   function onKey(e){keys[e.key]=e.type==='keydown';if(['ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();}
   document.addEventListener('keydown',onKey);document.addEventListener('keyup',onKey);
-  let touchBaseX=null;
-  canvas.addEventListener('touchstart',e=>{touchBaseX=e.touches[0].clientX;touchX=null;e.stopPropagation();},{passive:true});
-  canvas.addEventListener('touchmove',e=>{e.stopPropagation();const dx=e.touches[0].clientX-touchBaseX;if(dx>15)touchX=W;else if(dx<-15)touchX=0;else touchX=null;},{passive:true});
-  canvas.addEventListener('touchend',e=>{touchX=null;touchBaseX=null;e.stopPropagation();},{passive:true});
+
   function draw(){
     ctx.fillStyle='#0a0a00';ctx.fillRect(0,0,W,H);
     // blocks
@@ -641,8 +668,8 @@ function startBlock(){
       }
     });
     // pad
-    if(keys['ArrowLeft']||(touchX!==null&&touchX<W/2)){padX=Math.max(0,padX-6);}
-    if(keys['ArrowRight']||(touchX!==null&&touchX>W/2)){padX=Math.min(W-padW,padX+6);}
+    if(keys['ArrowLeft']||btnState.left){padX=Math.max(0,padX-6);}
+    if(keys['ArrowRight']||btnState.right){padX=Math.min(W-padW,padX+6);}
     ctx.fillStyle='#ffd700';ctx.beginPath();ctx.roundRect(padX,padY,padW,padH,5);ctx.fill();
     // ball
     ball.x+=ball.vx;ball.y+=ball.vy;
