@@ -337,16 +337,20 @@ function goTo(idx){
 // ══════════════════════════════════
 // SWIPE
 // ══════════════════════════════════
+let gameActive = false;
 function setupSwipe(){
   const feed = document.getElementById('feed');
-  feed.addEventListener('touchstart', e=>{ startY=e.touches[0].clientY; }, {passive:true});
+  let swipeStartX=0, swipeStartY=0;
+  feed.addEventListener('touchstart', e=>{ swipeStartY=e.touches[0].clientY; swipeStartX=e.touches[0].clientX; }, {passive:true});
   feed.addEventListener('touchend', e=>{
-    const dy = startY - e.changedTouches[0].clientY;
-    if(Math.abs(dy)>50){ dy>0 ? goTo(currentIdx+1) : goTo(currentIdx-1); }
+    if(gameActive) return;
+    const dy = swipeStartY - e.changedTouches[0].clientY;
+    const dx = Math.abs(e.changedTouches[0].clientX - swipeStartX);
+    if(Math.abs(dy)>80 && dx<40){ dy>0 ? goTo(currentIdx+1) : goTo(currentIdx-1); }
   }, {passive:true});
   document.addEventListener('keydown', e=>{
-    if(e.key==='ArrowUp') goTo(currentIdx-1);
-    if(e.key==='ArrowDown') goTo(currentIdx+1);
+    if(e.key==='ArrowUp'&&!gameActive) goTo(currentIdx-1);
+    if(e.key==='ArrowDown'&&!gameActive) goTo(currentIdx+1);
   });
 }
 
@@ -368,12 +372,14 @@ function startGame(id){
   const g = GAMES.find(x=>x.id===id);
   const overlay = document.getElementById('overlay_'+id);
   overlay.classList.add('hidden');
+  gameActive = true;
   g.start();
 }
 
 function stopCurrentGame(){
   const g = GAMES[currentIdx];
   if(g) g.stop();
+  gameActive = false;
 }
 
 function updateScore(id, s){
@@ -387,6 +393,7 @@ function updateScore(id, s){
 function gameOver(id, finalScore){
   const g = GAMES.find(x=>x.id===id);
   g.stop();
+  gameActive = false;
   const overlay = document.getElementById('overlay_'+id);
   overlay.classList.remove('hidden');
   overlay.querySelector('.overlay-title').textContent = 'GAME OVER';
@@ -448,9 +455,11 @@ function startSnake(){
   document.addEventListener('keydown',onKey);
   // スワイプ操作
   let ts={x:0,y:0};
-  canvas.addEventListener('touchstart',e=>{ts={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:true});
+  canvas.addEventListener('touchstart',e=>{ts={x:e.touches[0].clientX,y:e.touches[0].clientY};e.stopPropagation();},{passive:true});
   canvas.addEventListener('touchend',e=>{
+    e.stopPropagation();
     const dx=e.changedTouches[0].clientX-ts.x,dy=e.changedTouches[0].clientY-ts.y;
+    if(Math.max(Math.abs(dx),Math.abs(dy))<15) return;
     if(Math.abs(dx)>Math.abs(dy)){nextDir=dx>0?{x:1,y:0}:{x:-1,y:0};}
     else{nextDir=dy>0?{x:0,y:1}:{x:0,y:-1};}
   },{passive:true});
@@ -491,9 +500,9 @@ function startShooter(){
     if(['ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();
   }
   document.addEventListener('keydown',onKey);document.addEventListener('keyup',onKey);
-  canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;shoot();},{passive:true});
-  canvas.addEventListener('touchmove',e=>{touchX=e.touches[0].clientX;},{passive:true});
-  canvas.addEventListener('touchend',()=>{touchX=null;},{passive:true});
+  canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;shoot();e.stopPropagation();},{passive:true});
+  canvas.addEventListener('touchmove',e=>{touchX=e.touches[0].clientX;e.stopPropagation();},{passive:true});
+  canvas.addEventListener('touchend',e=>{touchX=null;e.stopPropagation();},{passive:true});
   // auto shoot
   let autoShoot=setInterval(shoot,400);
   function draw(){
@@ -554,9 +563,9 @@ function startDodge(){
   let obstacles=[],keys={},touchX=null;
   function onKey(e){keys[e.key]=e.type==='keydown';if(['ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();}
   document.addEventListener('keydown',onKey);document.addEventListener('keyup',onKey);
-  canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;},{passive:true});
-  canvas.addEventListener('touchmove',e=>{touchX=e.touches[0].clientX;},{passive:true});
-  canvas.addEventListener('touchend',()=>{touchX=null;},{passive:true});
+  canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;e.stopPropagation();},{passive:true});
+  canvas.addEventListener('touchmove',e=>{touchX=e.touches[0].clientX;e.stopPropagation();},{passive:true});
+  canvas.addEventListener('touchend',e=>{touchX=null;e.stopPropagation();},{passive:true});
   function spawnObs(){
     const w=Math.random()*50+20;
     obstacles.push({x:Math.random()*(W-w),y:-30,w,h:18,spd:speed+Math.random()*2,col:`hsl(${Math.random()*40+330},80%,55%)`});
@@ -614,9 +623,9 @@ function startBlock(){
   }
   function onKey(e){keys[e.key]=e.type==='keydown';if(['ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();}
   document.addEventListener('keydown',onKey);document.addEventListener('keyup',onKey);
-  canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;},{passive:true});
-  canvas.addEventListener('touchmove',e=>{touchX=e.touches[0].clientX;},{passive:true});
-  canvas.addEventListener('touchend',()=>{touchX=null;},{passive:true});
+  canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;e.stopPropagation();},{passive:true});
+  canvas.addEventListener('touchmove',e=>{touchX=e.touches[0].clientX;e.stopPropagation();},{passive:true});
+  canvas.addEventListener('touchend',e=>{touchX=null;e.stopPropagation();},{passive:true});
   function draw(){
     ctx.fillStyle='#0a0a00';ctx.fillRect(0,0,W,H);
     // blocks
