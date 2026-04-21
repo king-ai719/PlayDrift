@@ -500,9 +500,10 @@ function startShooter(){
     if(['ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();
   }
   document.addEventListener('keydown',onKey);document.addEventListener('keyup',onKey);
-  canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;shoot();e.stopPropagation();},{passive:true});
-  canvas.addEventListener('touchmove',e=>{touchX=e.touches[0].clientX;e.stopPropagation();},{passive:true});
-  canvas.addEventListener('touchend',e=>{touchX=null;e.stopPropagation();},{passive:true});
+  let touchBaseX=null;
+  canvas.addEventListener('touchstart',e=>{touchBaseX=e.touches[0].clientX;touchX=null;shoot();e.stopPropagation();},{passive:true});
+  canvas.addEventListener('touchmove',e=>{e.stopPropagation();const dx=e.touches[0].clientX-touchBaseX;if(dx>15)touchX=W;else if(dx<-15)touchX=0;else touchX=null;},{passive:true});
+  canvas.addEventListener('touchend',e=>{touchX=null;touchBaseX=null;e.stopPropagation();},{passive:true});
   // auto shoot
   let autoShoot=setInterval(shoot,400);
   function draw(){
@@ -563,9 +564,10 @@ function startDodge(){
   let obstacles=[],keys={},touchX=null;
   function onKey(e){keys[e.key]=e.type==='keydown';if(['ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();}
   document.addEventListener('keydown',onKey);document.addEventListener('keyup',onKey);
-  canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;e.stopPropagation();},{passive:true});
-  canvas.addEventListener('touchmove',e=>{touchX=e.touches[0].clientX;e.stopPropagation();},{passive:true});
-  canvas.addEventListener('touchend',e=>{touchX=null;e.stopPropagation();},{passive:true});
+  let touchBaseX=null;
+  canvas.addEventListener('touchstart',e=>{touchBaseX=e.touches[0].clientX;touchX=null;e.stopPropagation();},{passive:true});
+  canvas.addEventListener('touchmove',e=>{e.stopPropagation();const dx=e.touches[0].clientX-touchBaseX;if(dx>15)touchX=W;else if(dx<-15)touchX=0;else touchX=null;},{passive:true});
+  canvas.addEventListener('touchend',e=>{touchX=null;touchBaseX=null;e.stopPropagation();},{passive:true});
   function spawnObs(){
     const w=Math.random()*50+20;
     obstacles.push({x:Math.random()*(W-w),y:-30,w,h:18,spd:speed+Math.random()*2,col:`hsl(${Math.random()*40+330},80%,55%)`});
@@ -623,9 +625,10 @@ function startBlock(){
   }
   function onKey(e){keys[e.key]=e.type==='keydown';if(['ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();}
   document.addEventListener('keydown',onKey);document.addEventListener('keyup',onKey);
-  canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;e.stopPropagation();},{passive:true});
-  canvas.addEventListener('touchmove',e=>{touchX=e.touches[0].clientX;e.stopPropagation();},{passive:true});
-  canvas.addEventListener('touchend',e=>{touchX=null;e.stopPropagation();},{passive:true});
+  let touchBaseX=null;
+  canvas.addEventListener('touchstart',e=>{touchBaseX=e.touches[0].clientX;touchX=null;e.stopPropagation();},{passive:true});
+  canvas.addEventListener('touchmove',e=>{e.stopPropagation();const dx=e.touches[0].clientX-touchBaseX;if(dx>15)touchX=W;else if(dx<-15)touchX=0;else touchX=null;},{passive:true});
+  canvas.addEventListener('touchend',e=>{touchX=null;touchBaseX=null;e.stopPropagation();},{passive:true});
   function draw(){
     ctx.fillStyle='#0a0a00';ctx.fillRect(0,0,W,H);
     // blocks
