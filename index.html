@@ -86,6 +86,8 @@ svg.ico{width:16px;height:16px;fill:none;stroke:rgba(240,240,255,.7);stroke-widt
 
 /* ── SWIPE HINT ── */
 .swipe-hint{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;animation:floatUp 2s ease-in-out infinite}
+@keyframes twinkle{0%{opacity:.2}100%{opacity:.8}}
+@keyframes particleFly{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(.5)}}
 @keyframes floatUp{0%,100%{opacity:.4;transform:translateX(-50%) translateY(0)}50%{opacity:.8;transform:translateX(-50%) translateY(-6px)}}
 .hint-arrow{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:9px solid rgba(255,255,255,.5)}
 .hint-text{font-size:9px;font-family:var(--mono);color:var(--muted);letter-spacing:.1em}
@@ -247,9 +249,9 @@ const GAMES = [
   },
   {
     id: 'tetris',
-    title: 'テトリス',
+    title: 'アンブロック',
     genre: 'パズル',
-    desc: 'ブロックを積んでラインを消せ！消すほどスコアUP！',
+    desc: 'ブロックを落として横ラインを消せ！積み上がる前にクリアしろ！',
     bg: '#06001a',
     accentColor: '#00cfff',
     controls: '← → ↓ で移動 / ↑ で回転',
@@ -259,9 +261,9 @@ const GAMES = [
   },
   {
     id: 'puyo',
-    title: 'ぷよぷよ',
+    title: 'バブルドロップ',
     genre: 'パズル',
-    desc: '同じ色を4つ以上つなげて消せ！連鎖でボーナス！',
+    desc: '同じ色のバブルを4つ以上つなげて消せ！連鎖でボーナス！',
     bg: '#1a0a00',
     accentColor: '#ffaa00',
     controls: '← → で移動 / ↑ で回転',
@@ -271,15 +273,27 @@ const GAMES = [
   },
   {
     id: 'clicker',
-    title: 'たまごっちクリッカー',
+    title: 'タップペット',
     genre: '育成',
-    desc: 'タップしてキャラを育てよう！進化するかも！？',
+    desc: 'タップしてペットを育てよう！たまごから最強の神へ進化！',
     bg: '#0a001a',
     accentColor: '#ff88ff',
     controls: 'タップで育てる',
     init: initClicker,
     start: startClicker,
     stop: stopClicker,
+  },
+  ,{
+    id: 'rhythm',
+    title: 'リズムタップ',
+    genre: '音ゲー',
+    desc: 'ノーツが降ってきたらタップ！タイミングよく叩いてコンボを繋げ！',
+    bg: '#0d001a',
+    accentColor: '#ff44ff',
+    controls: 'タップでノーツを叩く',
+    init: initRhythm,
+    start: startRhythm,
+    stop: stopRhythm,
   },
 ];
 
@@ -449,7 +463,7 @@ function startGame(id){
   const overlay = document.getElementById('overlay_'+id);
   overlay.classList.add('hidden');
   gameActive = true;
-  if(id !== 'snake' && id !== 'clicker') showCtrlBtns(id);
+  if(id !== 'snake' && id !== 'clicker' && id !== 'rhythm') showCtrlBtns(id);
   g.start();
 }
 
@@ -960,71 +974,294 @@ function initClicker(canvas){
 function startClicker(){
   cancelAnimationFrame(clickerRAF);
   const canvas=document.getElementById('canvas_clicker');
-  const ctx=canvas.getContext('2d');
-  const W=canvas.width,H=canvas.height;
-  let score=0,clicks=0,particles=[];
+  const area=canvas.parentElement;
+  // canvasを非表示にしてDOMオーバーレイで描画
+  canvas.style.display='none';
+  let ui=document.getElementById('clicker_ui');
+  if(ui)ui.remove();
+  ui=document.createElement('div');
+  ui.id='clicker_ui';
+  ui.style.cssText='position:absolute;inset:0;background:#0a001a;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;overflow:hidden;';
+  area.appendChild(ui);
+
   const stages=[
-    {name:'たまご',emoji:'🥚',color:'#ffeecc',unlockAt:0},
-    {name:'ひよこ',emoji:'🐣',color:'#ffdd44',unlockAt:20},
-    {name:'にわとり',emoji:'🐔',color:'#ff8800',unlockAt:100},
-    {name:'ドラゴン',emoji:'🐉',color:'#ff4444',unlockAt:300},
-    {name:'神',emoji:'✨',color:'#ffffff',unlockAt:1000},
+    {name:'たまご',draw:drawEgg,color:'#ffeecc',unlockAt:0},
+    {name:'ひよこ',draw:drawChick,color:'#ffdd44',unlockAt:20},
+    {name:'にわとり',draw:drawHen,color:'#ff8800',unlockAt:100},
+    {name:'ドラゴン',draw:drawDragon,color:'#ff4444',unlockAt:300},
+    {name:'かみさま',draw:drawGod,color:'#ffffff',unlockAt:1000},
   ];
-  let stage=0;
-  let shakeX=0,shakeY=0;
+  let score=0,clicks=0,stageIdx=0;
+
   function getStage(){for(let i=stages.length-1;i>=0;i--)if(clicks>=stages[i].unlockAt)return i;return 0;}
-  function draw(){
-    ctx.fillStyle='#0a001a';ctx.fillRect(0,0,W,H);
-    // 星背景
-    ctx.fillStyle='rgba(255,136,255,.03)';
-    for(let i=0;i<5;i++){ctx.beginPath();ctx.arc(Math.sin(i*1.7)*W*.4+W/2,Math.cos(i*1.3)*H*.3+H/2,80+i*20,0,Math.PI*2);ctx.fill();}
-    const s=stages[stage];
-    // キャラ
-    ctx.font=`${80+stage*8}px serif`;ctx.textAlign='center';
-    ctx.fillText(s.emoji,W/2+shakeX,H/2+shakeY);
-    shakeX*=.8;shakeY*=.8;
-    // HP/レベルバー
-    const prog=stage<stages.length-1?(clicks-stages[stage].unlockAt)/(stages[stage+1].unlockAt-stages[stage].unlockAt):1;
-    ctx.fillStyle='rgba(255,136,255,.2)';ctx.beginPath();ctx.roundRect(W*.1,H*.72,W*.8,12,6);ctx.fill();
-    ctx.fillStyle=s.color;ctx.beginPath();ctx.roundRect(W*.1,H*.72,W*.8*prog,12,6);ctx.fill();
-    // ステージ名
-    ctx.fillStyle='rgba(255,136,255,.8)';ctx.font='bold 13px "Space Mono"';ctx.textAlign='center';
-    ctx.fillText(s.name,W/2,H*.7);
-    // スコア
-    ctx.fillStyle='rgba(255,255,255,.9)';ctx.font='bold 16px "Space Mono"';
-    ctx.fillText('TAP: '+clicks,W/2,H*.82);
-    // 次の進化
-    if(stage<stages.length-1){ctx.fillStyle='rgba(255,136,255,.5)';ctx.font='11px "Space Mono"';ctx.fillText('次の進化まで '+(stages[stage+1].unlockAt-clicks)+'回',W/2,H*.88);}
-    else{ctx.fillStyle='rgba(255,215,0,.8)';ctx.font='bold 13px "Space Mono"';ctx.fillText('★ 最強に進化済み ★',W/2,H*.88);}
-    // パーティクル
-    particles=particles.filter(p=>{
-      p.x+=p.vx;p.y+=p.vy;p.vy+=.15;p.life-=.03;
-      ctx.globalAlpha=p.life;ctx.font=`${p.size}px serif`;ctx.fillText(p.emoji,p.x,p.y);
-      ctx.globalAlpha=1;return p.life>0;
-    });
-    clickerRAF=requestAnimationFrame(draw);
+
+  // キャラSVG描画関数
+  function drawEgg(size){return `<ellipse cx="50" cy="55" rx="28" ry="35" fill="#fff8e7" stroke="#e8c97a" stroke-width="2"/><ellipse cx="42" cy="48" rx="5" ry="7" fill="rgba(255,255,255,.4)"/>`;}
+  function drawChick(size){return `<circle cx="50" cy="58" r="25" fill="#ffe066"/><circle cx="50" cy="32" r="18" fill="#ffe066"/><circle cx="43" cy="29" r="3" fill="#222"/><circle cx="57" cy="29" r="3" fill="#222"/><polygon points="50,36 45,42 55,42" fill="#ff8800"/><polygon points="30,50 20,45 28,55" fill="#ffe066"/><polygon points="70,50 80,45 72,55" fill="#ffe066"/>`;}
+  function drawHen(size){return `<ellipse cx="50" cy="62" rx="30" ry="24" fill="#cc4400"/><circle cx="50" cy="35" r="18" fill="#cc4400"/><circle cx="43" cy="32" r="3" fill="#222"/><circle cx="57" cy="32" r="3" fill="#222"/><polygon points="50,38 44,45 56,45" fill="#ff8800"/><polygon points="30,25 22,18 28,28 18,24 26,32" fill="#ff2222"/><polygon points="28,55 14,58 26,64" fill="#cc4400"/><polygon points="72,55 86,58 74,64" fill="#cc4400"/>`;}
+  function drawDragon(size){return `<ellipse cx="50" cy="65" rx="28" ry="20" fill="#22aa44"/><circle cx="50" cy="38" r="20" fill="#22aa44"/><circle cx="41" cy="34" r="4" fill="#ffdd00"/><circle cx="59" cy="34" r="4" fill="#ffdd00"/><circle cx="41" cy="34" r="2" fill="#222"/><circle cx="59" cy="34" r="2" fill="#222"/><polygon points="50,42 44,50 56,50" fill="#ff4444"/><polygon points="20,20 10,5 25,15 20,0 32,18" fill="#22aa44"/><polygon points="80,20 90,5 75,15 80,0 68,18" fill="#22aa44"/><polygon points="28,60 8,70 22,68 10,80 30,72" fill="#22aa44"/><polygon points="72,60 92,70 78,68 90,80 70,72" fill="#22aa44"/>`;}
+  function drawGod(size){return `<circle cx="50" cy="50" r="30" fill="rgba(255,215,0,.15)" stroke="rgba(255,215,0,.5)" stroke-width="1"/><circle cx="50" cy="50" r="20" fill="rgba(255,255,255,.9)"/><circle cx="50" cy="50" r="20" fill="none" stroke="#ffd700" stroke-width="2"/>${[0,45,90,135,180,225,270,315].map(a=>`<line x1="50" y1="50" x2="${50+Math.cos(a*Math.PI/180)*35}" y2="${50+Math.sin(a*Math.PI/180)*35}" stroke="rgba(255,215,0,.6)" stroke-width="1.5"/>`).join('')}<circle cx="43" cy="47" r="3" fill="#ffd700"/><circle cx="57" cy="47" r="3" fill="#ffd700"/><path d="M43,56 Q50,62 57,56" stroke="#ffd700" stroke-width="2" fill="none"/>`;}
+
+  ui.innerHTML=`
+    <div id="ck_bg" style="position:absolute;inset:0;overflow:hidden;">
+      ${Array.from({length:20},(_,i)=>`<div style="position:absolute;left:${Math.random()*100}%;top:${Math.random()*100}%;width:${2+Math.random()*3}px;height:${2+Math.random()*3}px;border-radius:50%;background:rgba(255,136,255,${0.1+Math.random()*.2});animation:twinkle ${1+Math.random()*2}s ease-in-out infinite alternate;"></div>`).join('')}
+    </div>
+    <div id="ck_char" style="width:120px;height:120px;cursor:pointer;transition:transform .1s;position:relative;z-index:2;">
+      <svg id="ck_svg" viewBox="0 0 100 100" width="120" height="120"></svg>
+    </div>
+    <div id="ck_name" style="font-family:'Space Mono',monospace;font-size:13px;color:rgba(255,136,255,.8);margin-top:8px;font-weight:bold;"></div>
+    <div style="width:80%;margin-top:10px;position:relative;z-index:2;">
+      <div style="height:10px;background:rgba(255,136,255,.15);border-radius:5px;overflow:hidden;">
+        <div id="ck_bar" style="height:100%;background:#ff88ff;border-radius:5px;transition:width .2s;width:0%"></div>
+      </div>
+    </div>
+    <div id="ck_score" style="font-family:'Space Mono',monospace;font-size:15px;color:rgba(255,255,255,.9);margin-top:12px;font-weight:bold;">TAP: 0</div>
+    <div id="ck_next" style="font-family:'Space Mono',monospace;font-size:10px;color:rgba(255,136,255,.5);margin-top:4px;"></div>
+    <div id="ck_particles" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;"></div>
+  `;
+
+  const svgEl=document.getElementById('ck_svg');
+  const charEl=document.getElementById('ck_char');
+  const nameEl=document.getElementById('ck_name');
+  const barEl=document.getElementById('ck_bar');
+  const scoreEl=document.getElementById('ck_score');
+  const nextEl=document.getElementById('ck_next');
+  const particlesEl=document.getElementById('ck_particles');
+
+  function updateUI(){
+    const s=stages[stageIdx];
+    svgEl.innerHTML=s.draw(100);
+    nameEl.textContent=s.name;
+    nameEl.style.color=s.color;
+    const prog=stageIdx<stages.length-1?(clicks-stages[stageIdx].unlockAt)/(stages[stageIdx+1].unlockAt-stages[stageIdx].unlockAt):1;
+    barEl.style.width=(prog*100)+'%';
+    barEl.style.background=s.color;
+    scoreEl.textContent='TAP: '+clicks;
+    if(stageIdx<stages.length-1)nextEl.textContent='次の進化まで '+(stages[stageIdx+1].unlockAt-clicks)+'回';
+    else nextEl.textContent='★ 最強に進化済み ★';
   }
+
+  function spawnParticle(x,y){
+    const p=document.createElement('div');
+    const symbols=['★','✦','◆','♦','•'];
+    p.textContent=symbols[Math.floor(Math.random()*symbols.length)];
+    p.style.cssText=`position:absolute;left:${x}px;top:${y}px;font-size:${14+Math.random()*10}px;color:${stages[stageIdx].color};pointer-events:none;animation:particleFly .8s forwards;`;
+    particlesEl.appendChild(p);
+    setTimeout(()=>p.remove(),800);
+  }
+
   function onTap(e){
     e.stopPropagation();
     clicks++;score=clicks*10;updateScore('clicker',score);
-    shakeX=(Math.random()-.5)*12;shakeY=(Math.random()-.5)*12;
+    charEl.style.transform='scale(0.88)';
+    setTimeout(()=>charEl.style.transform='scale(1)',100);
     const newStage=getStage();
-    if(newStage>stage){stage=newStage;showToast('進化！'+stages[stage].emoji+' '+stages[stage].name);}
+    if(newStage>stageIdx){stageIdx=newStage;showToast('進化！ '+stages[stageIdx].name);}
+    const rect=ui.getBoundingClientRect();
     const cx=e.touches?e.touches[0].clientX:e.clientX;
     const cy=e.touches?e.touches[0].clientY:e.clientY;
-    const rect=canvas.getBoundingClientRect();
-    particles.push({x:cx-rect.left,y:cy-rect.top,vx:(Math.random()-.5)*3,vy:-Math.random()*4-2,life:1,emoji:['✨','💫','⭐','💥'][Math.floor(Math.random()*4)],size:16+Math.random()*10});
+    spawnParticle(cx-rect.left,cy-rect.top);
+    updateUI();
   }
-  canvas.addEventListener('touchstart',onTap,{passive:true});
-  canvas.addEventListener('click',onTap);
-  gameHandles.clicker={onTap};
-  draw();
+
+  charEl.addEventListener('touchstart',onTap,{passive:true});
+  charEl.addEventListener('click',onTap);
+  ui.addEventListener('touchstart',onTap,{passive:true});
+  ui.addEventListener('click',onTap);
+  gameHandles.clicker={onTap,ui};
+  updateUI();
 }
 function stopClicker(){
   cancelAnimationFrame(clickerRAF);
-  if(gameHandles.clicker){
-    const canvas=document.getElementById('canvas_clicker');
-    if(canvas){canvas.removeEventListener('touchstart',gameHandles.clicker.onTap);canvas.removeEventListener('click',gameHandles.clicker.onTap);}
+  const canvas=document.getElementById('canvas_clicker');
+  if(canvas)canvas.style.display='block';
+  const ui=document.getElementById('clicker_ui');
+  if(ui)ui.remove();
+  if(gameHandles.clicker){}
+}
+
+
+// ══════════════════════════════════
+// RHYTHM
+// ══════════════════════════════════
+let rhythmRAF;
+function initRhythm(canvas){
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#0d001a';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#ff44ff';ctx.font='bold 14px "Space Mono"';ctx.textAlign='center';
+  ctx.fillText('TAP PLAY TO START',canvas.width/2,canvas.height/2);
+}
+function startRhythm(){
+  cancelAnimationFrame(rhythmRAF);
+  const canvas=document.getElementById('canvas_rhythm');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const LANES=4;
+  const LW=W/LANES;
+  const HIT_Y=H-70;
+  const NOTE_R=22;
+  const COLORS=['#ff44ff','#44ffff','#ffff44','#ff8844'];
+  const KEYS=['a','s','d','f'];
+  let notes=[],particles=[],score=0,combo=0,maxCombo=0,frame=0,miss=0;
+  let laneFlash=[0,0,0,0];
+  let beatInterval=60; // フレーム間隔（BPM100相当）
+  let judgement={text:'',color:'',life:0};
+
+  // Web Audio APIでビープ音
+  let audioCtx=null;
+  function beep(freq=440,dur=0.08,vol=0.3){
+    try{
+      if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+      const o=audioCtx.createOscillator();
+      const g=audioCtx.createGain();
+      o.connect(g);g.connect(audioCtx.destination);
+      o.frequency.value=freq;o.type='sine';
+      g.gain.setValueAtTime(vol,audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur);
+      o.start();o.stop(audioCtx.currentTime+dur);
+    }catch(e){}
+  }
+
+  function spawnNote(){
+    const lane=Math.floor(Math.random()*LANES);
+    notes.push({lane,y:-NOTE_R,speed:5+Math.floor(score/200)*0.3});
+  }
+
+  function hitLane(lane){
+    laneFlash[lane]=8;
+    beep([330,440,550,660][lane],0.1,0.25);
+    // 判定
+    const hit=notes.find(n=>n.lane===lane&&Math.abs(n.y-HIT_Y)<50&&!n.hit);
+    if(hit){
+      hit.hit=true;
+      const dist=Math.abs(hit.y-HIT_Y);
+      let j='MISS',pts=0,col='#ff4444';
+      if(dist<15){j='PERFECT';pts=100;col='#ffff44';}
+      else if(dist<30){j='GREAT';pts=60;col='#44ffff';}
+      else if(dist<50){j='GOOD';pts=30;col='#ff88ff';}
+      if(pts>0){combo++;if(combo>maxCombo)maxCombo=combo;score+=pts*(1+Math.floor(combo/10));}
+      else{combo=0;}
+      judgement={text:j,color:col,life:40};
+      // パーティクル
+      const lx=lane*LW+LW/2;
+      for(let i=0;i<8;i++)particles.push({x:lx,y:HIT_Y,vx:(Math.random()-.5)*6,vy:-Math.random()*5-2,life:1,col:COLORS[lane],r:4+Math.random()*4});
+      updateScore('rhythm',score);
+    }else{combo=0;miss++;judgement={text:'MISS',color:'#ff4444',life:30};}
+  }
+
+  function onKey(e){
+    const idx=KEYS.indexOf(e.key);
+    if(idx>=0){hitLane(idx);e.preventDefault();}
+  }
+  document.addEventListener('keydown',onKey);
+
+  // タッチ：どのレーンか判定
+  function onTouch(e){
+    e.stopPropagation();
+    const rect=canvas.getBoundingClientRect();
+    Array.from(e.changedTouches||[e]).forEach(t=>{
+      const x=(t.clientX||t.x)-rect.left;
+      const lane=Math.floor(x/LW);
+      if(lane>=0&&lane<LANES)hitLane(lane);
+    });
+  }
+  canvas.addEventListener('touchstart',onTouch,{passive:true});
+  canvas.addEventListener('click',onTouch);
+
+  gameHandles.rhythm={onKey,onTouch};
+
+  function draw(){
+    ctx.fillStyle='#0d001a';ctx.fillRect(0,0,W,H);
+
+    // レーン背景
+    for(let i=0;i<LANES;i++){
+      ctx.fillStyle=i%2===0?'rgba(255,255,255,.02)':'rgba(255,255,255,.04)';
+      ctx.fillRect(i*LW,0,LW,H);
+      // レーン区切り
+      ctx.strokeStyle='rgba(255,255,255,.08)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(i*LW,0);ctx.lineTo(i*LW,H);ctx.stroke();
+    }
+
+    // ヒットライン
+    ctx.strokeStyle='rgba(255,255,255,.3)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(0,HIT_Y);ctx.lineTo(W,HIT_Y);ctx.stroke();
+
+    // ヒットゾーン（各レーン）
+    for(let i=0;i<LANES;i++){
+      const lx=i*LW+LW/2;
+      const flash=laneFlash[i]>0;
+      ctx.fillStyle=flash?COLORS[i]:'rgba(255,255,255,.08)';
+      ctx.beginPath();ctx.arc(lx,HIT_Y,NOTE_R,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=COLORS[i];ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(lx,HIT_Y,NOTE_R,0,Math.PI*2);ctx.stroke();
+      if(laneFlash[i]>0)laneFlash[i]--;
+    }
+
+    // ノーツ
+    notes=notes.filter(n=>{
+      n.y+=n.speed;
+      if(!n.hit){
+        const lx=n.lane*LW+LW/2;
+        // グロー
+        ctx.shadowColor=COLORS[n.lane];ctx.shadowBlur=12;
+        ctx.fillStyle=COLORS[n.lane];
+        ctx.beginPath();ctx.arc(lx,n.y,NOTE_R,0,Math.PI*2);ctx.fill();
+        ctx.shadowBlur=0;
+        ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=2;
+        ctx.beginPath();ctx.arc(lx,n.y,NOTE_R,0,Math.PI*2);ctx.stroke();
+      }
+      if(n.y>HIT_Y+60&&!n.hit){combo=0;miss++;judgement={text:'MISS',color:'#ff4444',life:30};}
+      return n.y<H+30;
+    });
+
+    // パーティクル
+    particles=particles.filter(p=>{
+      p.x+=p.vx;p.y+=p.vy;p.vy+=.2;p.life-=.06;
+      ctx.globalAlpha=p.life;ctx.fillStyle=p.col;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=1;return p.life>0;
+    });
+
+    // 判定テキスト
+    if(judgement.life>0){
+      ctx.globalAlpha=Math.min(1,judgement.life/15);
+      ctx.fillStyle=judgement.color;ctx.font='bold 22px "Space Mono"';ctx.textAlign='center';
+      ctx.fillText(judgement.text,W/2,HIT_Y-50);
+      ctx.globalAlpha=1;judgement.life--;
+    }
+
+    // UI上部
+    ctx.fillStyle='rgba(255,255,255,.9)';ctx.font='bold 13px "Space Mono"';ctx.textAlign='left';
+    ctx.fillText('SCORE: '+score,10,24);
+    ctx.textAlign='right';
+    ctx.fillText('COMBO: '+combo,W-10,24);
+    ctx.textAlign='center';
+    ctx.fillStyle='rgba(255,255,255,.4)';ctx.font='10px "Space Mono"';
+    ctx.fillText('BEST COMBO: '+maxCombo,W/2,24);
+
+    // レーンラベル
+    for(let i=0;i<LANES;i++){
+      ctx.fillStyle='rgba(255,255,255,.3)';ctx.font='10px "Space Mono"';ctx.textAlign='center';
+      ctx.fillText(['A','S','D','F'][i],i*LW+LW/2,H-10);
+    }
+
+    frame++;
+    if(frame%beatInterval===0)spawnNote();
+    if(frame%Math.max(20,beatInterval-Math.floor(score/500))===0&&frame>0&&frame%beatInterval!==0)
+      if(Math.random()<.3)spawnNote();
+
+    // miss多すぎたらgame over
+    if(miss>=10){gameOver('rhythm',score);return;}
+    rhythmRAF=requestAnimationFrame(draw);
+  }
+  draw();
+}
+function stopRhythm(){
+  cancelAnimationFrame(rhythmRAF);
+  if(gameHandles.rhythm){
+    document.removeEventListener('keydown',gameHandles.rhythm.onKey);
+    const canvas=document.getElementById('canvas_rhythm');
+    if(canvas){canvas.removeEventListener('touchstart',gameHandles.rhythm.onTouch);canvas.removeEventListener('click',gameHandles.rhythm.onTouch);}
   }
 }
 
@@ -1039,6 +1276,7 @@ const DUMMY = {
   tetris:[{n:'リュウ',s:4200},{n:'ミオ',s:3800},{n:'ショウ',s:2900},{n:'アヤ',s:2100},{n:'タク',s:1500}],
   puyo:[{n:'ハナ',s:3200},{n:'ケイタ',s:2700},{n:'ユズ',s:1900},{n:'リク',s:1400},{n:'モモ',s:900}],
   clicker:[{n:'ソラ',s:9800},{n:'イツキ',s:7200},{n:'ナギ',s:5600},{n:'コトネ',s:3400},{n:'ヒビキ',s:2100}],
+  rhythm:[{n:'ビート',s:9500},{n:'リズム',s:8200},{n:'ノア',s:6700},{n:'カナ',s:4800},{n:'ソウ',s:3100}],
 };
 let rankGame='snake';
 function openRank(){
