@@ -284,6 +284,18 @@ const GAMES = [
     stop: stopClicker,
   },
   {
+    id: 'papillon',
+    title: 'パピヨンラン',
+    genre: '横スクロール',
+    desc: '骨を集めてドッグランを駆け抜けろ！肉でパワーアップ！虫に当たるな！',
+    bg: '#001833',
+    accentColor: '#ffcc44',
+    controls: 'タップでジャンプ',
+    init: initPapillon,
+    start: startPapillon,
+    stop: stopPapillon,
+  },
+  {
     id: 'rhythm',
     title: 'リズムタップ',
     genre: '音ゲー',
@@ -463,7 +475,7 @@ function startGame(id){
   const overlay = document.getElementById('overlay_'+id);
   overlay.classList.add('hidden');
   gameActive = true;
-  if(id !== 'snake' && id !== 'clicker' && id !== 'rhythm') showCtrlBtns(id);
+  if(id !== 'snake' && id !== 'clicker' && id !== 'rhythm' && id !== 'papillon') showCtrlBtns(id);
   g.start();
 }
 
@@ -1081,6 +1093,261 @@ function stopClicker(){
 }
 
 
+
+// ══════════════════════════════════
+// PAPILLON RUN
+// ══════════════════════════════════
+let papillonRAF;
+function initPapillon(canvas){
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#001833';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#ffcc44';ctx.font='bold 14px "Space Mono"';ctx.textAlign='center';
+  ctx.fillText('TAP PLAY TO START',canvas.width/2,canvas.height/2);
+}
+function startPapillon(){
+  cancelAnimationFrame(papillonRAF);
+  const canvas=document.getElementById('canvas_papillon');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width,H=canvas.height;
+  const GY=H-80; // 地面Y
+  let score=0,frame=0,speed=3,powered=0;
+  // パピヨン
+  let dog={x:60,y:GY,vy:0,onGround:true,leg:0,powerTimer:0};
+  let items=[],enemies=[],clouds=[],bgX=0;
+  let isDead=false;
+
+  // 雲初期化
+  for(let i=0;i<4;i++) clouds.push({x:Math.random()*W,y:50+Math.random()*80,w:60+Math.random()*50,speed:.3+Math.random()*.3});
+
+  function jump(){
+    if(dog.onGround){
+      dog.vy=-13;
+      dog.onGround=false;
+    } else if(dog.powerTimer>0 && dog.vy>0){
+      // パワー中は二段ジャンプ
+      dog.vy=-10;
+    }
+  }
+
+  canvas.addEventListener('touchstart',e=>{e.stopPropagation();jump();},{passive:true});
+  canvas.addEventListener('click',jump);
+  document.addEventListener('keydown',function onK(e){if(e.key===' '||e.key==='ArrowUp'){jump();e.preventDefault();}});
+  gameHandles.papillon={onK:function(e){if(e.key===' '||e.key==='ArrowUp'){jump();e.preventDefault();}}};
+  document.addEventListener('keydown',gameHandles.papillon.onK);
+
+  function spawnItem(){
+    const r=Math.random();
+    if(r<0.55){
+      // 骨
+      items.push({x:W+20,y:GY-30-Math.random()*60,type:'bone'});
+    } else if(r<0.75){
+      // 肉（パワーアップ）
+      items.push({x:W+20,y:GY-40,type:'meat'});
+    }
+  }
+  function spawnEnemy(){
+    const r=Math.random();
+    if(r<0.5){
+      // 地上の虫
+      enemies.push({x:W+20,y:GY-18,w:28,h:20,type:'bug'});
+    } else {
+      // 飛ぶ虫
+      enemies.push({x:W+20,y:GY-80-Math.random()*60,w:24,h:18,type:'fly'});
+    }
+  }
+
+  // SVG描画ヘルパー
+  function drawDog(ctx,x,y,leg,powered){
+    const c=powered?'#ff8800':'#c8813a';
+    const lc=powered?'#ffcc00':'#8b5e3c';
+    // 胴体
+    ctx.fillStyle=c;ctx.beginPath();ctx.ellipse(x,y-12,18,10,0,0,Math.PI*2);ctx.fill();
+    // 頭
+    ctx.fillStyle=c;ctx.beginPath();ctx.arc(x+18,y-18,10,0,Math.PI*2);ctx.fill();
+    // 耳（パピヨンの大きな耳）
+    ctx.fillStyle=lc;
+    ctx.beginPath();ctx.moveTo(x+14,y-24);ctx.lineTo(x+5,y-42);ctx.lineTo(x+18,y-28);ctx.fill();
+    ctx.beginPath();ctx.moveTo(x+22,y-24);ctx.lineTo(x+35,y-42);ctx.lineTo(x+20,y-28);ctx.fill();
+    // 目
+    ctx.fillStyle='#222';ctx.beginPath();ctx.arc(x+22,y-20,2.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x+23,y-21,1,0,Math.PI*2);ctx.fill();
+    // 鼻
+    ctx.fillStyle='#333';ctx.beginPath();ctx.arc(x+27,y-17,2,0,Math.PI*2);ctx.fill();
+    // しっぽ
+    ctx.strokeStyle=c;ctx.lineWidth=4;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(x-16,y-14);ctx.quadraticCurveTo(x-28,y-30,x-20,y-38);ctx.stroke();
+    // 脚（アニメ）
+    const legOff=Math.sin(leg*.3)*8;
+    ctx.fillStyle=lc;
+    ctx.fillRect(x-10,y-4,6,10+legOff);
+    ctx.fillRect(x,y-4,6,10-legOff);
+    ctx.fillRect(x+10,y-4,6,10+legOff);
+    ctx.fillRect(x+18,y-4,6,10-legOff);
+    // パワー中のオーラ
+    if(powered>0){
+      ctx.strokeStyle='rgba(255,200,0,.4)';ctx.lineWidth=3;
+      ctx.beginPath();ctx.ellipse(x+5,y-15,26,18,0,0,Math.PI*2);ctx.stroke();
+    }
+  }
+
+  function drawBone(ctx,x,y){
+    ctx.fillStyle='#fff';ctx.strokeStyle='#ccc';ctx.lineWidth=1;
+    // 軸
+    ctx.fillRect(x-10,y-3,20,6);
+    // 4つの丸
+    [[-10,-5],[-10,5],[10,-5],[10,5]].forEach(([dx,dy])=>{
+      ctx.beginPath();ctx.arc(x+dx,y+dy,5,0,Math.PI*2);ctx.fill();ctx.stroke();
+    });
+  }
+
+  function drawMeat(ctx,x,y){
+    ctx.fillStyle='#dd4444';
+    ctx.beginPath();ctx.ellipse(x,y,14,10,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ff8888';
+    ctx.beginPath();ctx.ellipse(x-3,y-3,6,4,-.5,0,Math.PI*2);ctx.fill();
+    // 骨の突起
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(x+12,y-5,5,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(x+14,y+2,4,0,Math.PI*2);ctx.fill();
+  }
+
+  function drawBug(ctx,x,y,fly,f){
+    // 体
+    ctx.fillStyle='#336600';
+    ctx.beginPath();ctx.ellipse(x,y,12,8,0,0,Math.PI*2);ctx.fill();
+    // 頭
+    ctx.fillStyle='#224400';
+    ctx.beginPath();ctx.arc(x+12,y,7,0,Math.PI*2);ctx.fill();
+    // 目
+    ctx.fillStyle='#ff0';ctx.beginPath();ctx.arc(x+15,y-2,2,0,Math.PI*2);ctx.fill();
+    // 脚
+    ctx.strokeStyle='#224400';ctx.lineWidth=1.5;
+    [-6,-1,4].forEach(ox=>{
+      ctx.beginPath();ctx.moveTo(x+ox,y);ctx.lineTo(x+ox-6,y+10);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x+ox,y);ctx.lineTo(x+ox-6,y-10);ctx.stroke();
+    });
+    // 羽（飛ぶ虫）
+    if(fly){
+      const wa=Math.sin(f*.3)*0.4;
+      ctx.fillStyle='rgba(150,255,150,.5)';
+      ctx.beginPath();ctx.ellipse(x-4,y-8,14,6,wa,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(x-4,y+8,14,6,-wa,0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  function drawScene(){
+    // 空グラデ
+    const grad=ctx.createLinearGradient(0,0,0,GY);
+    grad.addColorStop(0,dog.powerTimer>0?'#1a0533':'#001833');
+    grad.addColorStop(1,dog.powerTimer>0?'#330a66':'#003366');
+    ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+
+    // 雲
+    clouds.forEach(c=>{
+      c.x-=c.speed;if(c.x+c.w<0)c.x=W+c.w;
+      ctx.fillStyle='rgba(255,255,255,.15)';
+      ctx.beginPath();ctx.ellipse(c.x,c.y,c.w/2,12,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(c.x-15,c.y+5,c.w/3,10,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(c.x+15,c.y+5,c.w/3,10,0,0,Math.PI*2);ctx.fill();
+    });
+
+    // 地面
+    ctx.fillStyle='#2d5a1b';ctx.fillRect(0,GY+4,W,H-GY);
+    ctx.fillStyle='#3d7a25';ctx.fillRect(0,GY,W,8);
+    // 地面の模様
+    for(let gx=(bgX%40);gx<W;gx+=40){
+      ctx.fillStyle='rgba(255,255,255,.05)';ctx.fillRect(gx,GY,20,4);
+    }
+
+    // アイテム
+    items.forEach(it=>{
+      it.x-=speed;
+      if(it.type==='bone') drawBone(ctx,it.x,it.y);
+      else drawMeat(ctx,it.x,it.y);
+    });
+
+    // 敵
+    enemies.forEach(en=>{
+      en.x-=speed;
+      drawBug(ctx,en.x,en.y,en.type==='fly',frame);
+    });
+
+    // パピヨン
+    drawDog(ctx,dog.x,dog.y,dog.leg,dog.powerTimer);
+  }
+
+  function checkCollisions(){
+    // アイテム取得
+    items=items.filter(it=>{
+      const dx=it.x-(dog.x+5),dy=it.y-(dog.y-12);
+      if(Math.sqrt(dx*dx+dy*dy)<28){
+        if(it.type==='bone'){score+=10;updateScore('papillon',score);showToast('🦴 +10!');}
+        else{dog.powerTimer=180;showToast('🥩 パワーアップ！');}
+        return false;
+      }
+      return it.x>-30;
+    });
+    // 敵
+    if(!dog.powerTimer){
+      enemies.forEach(en=>{
+        const dx=en.x-(dog.x+18),dy=en.y-(dog.y-12);
+        if(Math.sqrt(dx*dx+dy*dy)<24&&!isDead){isDead=true;gameOver('papillon',score);}
+      });
+    } else {
+      // パワー中は敵を倒せる
+      enemies=enemies.filter(en=>{
+        const dx=en.x-(dog.x+18),dy=en.y-(dog.y-12);
+        if(Math.sqrt(dx*dx+dy*dy)<28){score+=20;updateScore('papillon',score);return false;}
+        return en.x>-30;
+      });
+    }
+    enemies=enemies.filter(en=>en.x>-40);
+  }
+
+  function draw(){
+    if(isDead)return;
+    frame++;
+    bgX-=speed;
+    speed=3+frame/600;
+    if(dog.powerTimer>0)dog.powerTimer--;
+
+    // 重力
+    dog.vy+=0.6;
+    dog.y+=dog.vy;
+    if(dog.y>=GY){dog.y=GY;dog.vy=0;dog.onGround=true;}
+    dog.leg+=dog.onGround?1:0;
+
+    // スポーン
+    if(frame%Math.max(60,120-Math.floor(frame/200)*5)===0)spawnItem();
+    if(frame%Math.max(80,160-Math.floor(frame/300)*10)===0)spawnEnemy();
+
+    // 走行スコア
+    if(frame%30===0){score++;updateScore('papillon',score);}
+
+    drawScene();
+    checkCollisions();
+
+    // UI
+    ctx.fillStyle='rgba(255,204,68,.9)';ctx.font='bold 13px "Space Mono"';ctx.textAlign='left';
+    ctx.fillText('SCORE: '+score,10,24);
+    if(dog.powerTimer>0){
+      ctx.fillStyle='rgba(255,140,0,.9)';ctx.textAlign='center';
+      ctx.fillText('⚡ POWER! '+(Math.ceil(dog.powerTimer/60))+'s',W/2,44);
+    }
+
+    papillonRAF=requestAnimationFrame(draw);
+  }
+  draw();
+}
+function stopPapillon(){
+  cancelAnimationFrame(papillonRAF);
+  if(gameHandles.papillon){
+    document.removeEventListener('keydown',gameHandles.papillon.onK);
+    const canvas=document.getElementById('canvas_papillon');
+    if(canvas){canvas.removeEventListener('touchstart',gameHandles.papillon.onTouch);canvas.removeEventListener('click',gameHandles.papillon.jump);}
+  }
+}
+
 // ══════════════════════════════════
 // RHYTHM
 // ══════════════════════════════════
@@ -1109,16 +1376,22 @@ function startRhythm(){
 
   // Web Audio APIでビープ音
   let audioCtx=null;
-  function beep(freq=440,dur=0.08,vol=0.3){
+  function initAudio(){
+    try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}
+  }
+  function beep(freq,dur,vol){
+    freq=freq||440;dur=dur||0.08;vol=vol||0.2;
     try{
-      if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+      if(!audioCtx)return;
+      if(audioCtx.state==='suspended')audioCtx.resume();
       const o=audioCtx.createOscillator();
       const g=audioCtx.createGain();
       o.connect(g);g.connect(audioCtx.destination);
       o.frequency.value=freq;o.type='sine';
       g.gain.setValueAtTime(vol,audioCtx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur);
-      o.start();o.stop(audioCtx.currentTime+dur);
+      g.gain.linearRampToValueAtTime(0.001,audioCtx.currentTime+dur);
+      o.start(audioCtx.currentTime);
+      o.stop(audioCtx.currentTime+dur+0.01);
     }catch(e){}
   }
 
@@ -1128,8 +1401,9 @@ function startRhythm(){
   }
 
   function hitLane(lane){
+    initAudio();
     laneFlash[lane]=8;
-    beep([330,440,550,660][lane],0.1,0.25);
+    beep([330,440,550,660][lane],0.1,0.2);
     // 判定
     const hit=notes.find(n=>n.lane===lane&&Math.abs(n.y-HIT_Y)<50&&!n.hit);
     if(hit){
@@ -1277,6 +1551,7 @@ const DUMMY = {
   puyo:[{n:'ハナ',s:3200},{n:'ケイタ',s:2700},{n:'ユズ',s:1900},{n:'リク',s:1400},{n:'モモ',s:900}],
   clicker:[{n:'ソラ',s:9800},{n:'イツキ',s:7200},{n:'ナギ',s:5600},{n:'コトネ',s:3400},{n:'ヒビキ',s:2100}],
   rhythm:[{n:'ビート',s:9500},{n:'リズム',s:8200},{n:'ノア',s:6700},{n:'カナ',s:4800},{n:'ソウ',s:3100}],
+  papillon:[{n:'イヌ好き',s:4200},{n:'わんちゃん',s:3500},{n:'パピ',s:2800},{n:'チワワ',s:1900},{n:'ポチ',s:1200}],
 };
 let rankGame='snake';
 function openRank(){
