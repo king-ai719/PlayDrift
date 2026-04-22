@@ -404,7 +404,7 @@ function setupSwipe(){
     if(gameActive) return;
     const dy = swipeStartY - e.changedTouches[0].clientY;
     const dx = Math.abs(e.changedTouches[0].clientX - swipeStartX);
-    if(Math.abs(dy)>80 && dx<40){ dy>0 ? goTo(currentIdx+1) : goTo(currentIdx-1); }
+    if(Math.abs(dy)>30 && dx<60){ dy>0 ? goTo(currentIdx+1) : goTo(currentIdx-1); }
   }, {passive:true});
   document.addEventListener('keydown', e=>{
     if(e.key==='ArrowUp'&&!gameActive) goTo(currentIdx-1);
